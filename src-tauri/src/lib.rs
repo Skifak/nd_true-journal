@@ -131,6 +131,12 @@ fn list_data_files(app: tauri::AppHandle, rel_dir: String) -> Result<Vec<String>
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Workaround: webkit2gtk падает с «Error 71 (Protocol error)» на некоторых
+    // Wayland-композиторах. Форсируем X11 (XWayland) до инициализации GTK.
+    // На Windows переменная игнорируется.
+    if std::env::var("GDK_BACKEND").is_err() {
+        std::env::set_var("GDK_BACKEND", "x11");
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
