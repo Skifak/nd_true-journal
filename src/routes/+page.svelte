@@ -13,124 +13,181 @@
 		saved = 'сохранено';
 		setTimeout(() => (saved = ''), 2500);
 	}
+
+	// KPI-метрики (пока демо-значения, дальше — из реальных сделок)
+	const kpis = [
+		{ label: 'Баланс', value: '0,00 $', delta: null },
+		{ label: 'Сделок за месяц', value: '0', delta: null },
+		{ label: 'Winrate', value: '—', delta: null },
+		{ label: 'Дисциплина', value: '—', delta: null }
+	];
+
+	const activity = [
+		{ icon: '＋', title: 'Журнал создан', time: 'только что' },
+		{ icon: '◈', title: 'Платформа: ' + detectPlatform(), time: 'при запуске' },
+		{ icon: '◇', title: 'Данные хранятся локально', time: 'постоянно' }
+	];
 </script>
 
-<div class="frame">
-	<header>
-		<span class="wordmark">TRUE JOURNAL</span>
-		<span class="eyebrow">офлайн · без серверов</span>
-	</header>
+<!-- KPI-сетка: плотная, с волосяными gap-px разделителями -->
+<section class="kpi-grid" aria-label="Ключевые показатели">
+	{#each kpis as kpi}
+		<div class="kpi">
+			<p class="kpi-label">{kpi.label}</p>
+			<p class="kpi-value">{kpi.value}</p>
+		</div>
+	{/each}
+</section>
 
-	<main>
-		<section class="hero">
-			<h1>Тихий журнал<br /><em>для громкой торговли</em></h1>
-			<p class="lead">
-				Ваши сделки не покидают устройство. Ни аккаунтов, ни облака, ни слежки —
-				только ты и записи.
-			</p>
-			<div class="hero-meta">
-				<span class="badge">v0.1</span>
-				<span class="badge">{platform}{isTauri() ? ' · нативно' : ' · браузер'}</span>
-			</div>
-		</section>
+<section class="grid-2">
+	<!-- График-заглушка: кривая equity на SVG -->
+	<div class="panel">
+		<div class="panel-head">
+			<h2 class="panel-title">Кривая капитала</h2>
+			<span class="eyebrow">все сделки</span>
+		</div>
+		<div class="empty">
+			<svg viewBox="0 0 200 60" class="spark" aria-hidden="true">
+				<line x1="0" y1="30" x2="200" y2="30" stroke="var(--line)" stroke-dasharray="2 4" />
+				<path d="M0 30 C 30 26, 50 34, 80 30 S 140 24, 200 30" fill="none" stroke="var(--sage)" stroke-width="1" opacity="0.6" />
+			</svg>
+			<p class="empty-title">Пока пусто</p>
+			<p class="empty-desc">Добавьте первую сделку — кривая начнёт рисоваться.</p>
+		</div>
+	</div>
 
-		<section class="quick">
-			<div class="card">
-				<p class="card-label">01 ／ заметка дня</p>
-				<textarea bind:value={note} rows="3" placeholder="Что важно запомнить с сегодняшней сессии…"></textarea>
-				<div class="row">
-					<button class="btn" onclick={save}>Сохранить</button>
-					{#if saved}<span class="hint">{saved} локально</span>{/if}
-				</div>
-			</div>
+	<!-- Заметка дня -->
+	<div class="panel">
+		<div class="panel-head">
+			<h2 class="panel-title">Заметка дня</h2>
+			<span class="eyebrow">локально</span>
+		</div>
+		<textarea bind:value={note} rows="4" placeholder="Что важно запомнить с сегодняшней сессии…"></textarea>
+		<div class="row">
+			<button class="btn" onclick={save}>Сохранить</button>
+			{#if saved}<span class="hint">↳ {saved}</span>{/if}
+		</div>
+	</div>
+</section>
 
-			<div class="card">
-				<p class="card-label">02 ／ принципы</p>
-				<ul>
-					<li>ноль рантайм-зависимостей</li>
-					<li>данные не покидают устройство</li>
-					<li>файлы — только в песочнице приложения</li>
-					<li>строгая CSP, сетевых вызовов нет</li>
-				</ul>
-			</div>
-		</section>
-	</main>
+<section class="grid-2">
+	<!-- Активность -->
+	<div class="panel">
+		<div class="panel-head">
+			<h2 class="panel-title">Активность</h2>
+			<span class="eyebrow">последние события</span>
+		</div>
+		<ul class="feed">
+			{#each activity as a}
+				<li>
+					<span class="feed-icon">{a.icon}</span>
+					<span class="feed-body">
+						<span class="feed-title">{a.title}</span>
+						<span class="feed-time">{a.time}</span>
+					</span>
+				</li>
+			{/each}
+		</ul>
+	</div>
 
-	<footer>
-		<span class="eyebrow">nd true journal ／ 01</span>
-	</footer>
-</div>
+	<!-- Состояние системы -->
+	<div class="panel">
+		<div class="panel-head">
+			<h2 class="panel-title">Состояние</h2>
+			<span class="eyebrow">безопасность</span>
+		</div>
+		<ul class="status-list">
+			<li><span class="dot ok"></span>Сетевых вызовов нет</li>
+			<li><span class="dot ok"></span>Данные не покидают устройство</li>
+			<li><span class="dot ok"></span>Файлы — только в песочнице приложения</li>
+			<li><span class="dot"></span>Платформа: {platform}{isTauri() ? ' (нативная оболочка)' : ''}</li>
+		</ul>
+	</div>
+</section>
 
 <style>
-	.frame {
-		min-height: 100dvh;
-		display: flex;
-		flex-direction: column;
-		max-width: 1120px;
-		margin: 0 auto;
-		padding: clamp(20px, 5vw, 48px);
-	}
-
-	header {
-		display: flex;
-		justify-content: space-between;
-		align-items: baseline;
-		padding-bottom: var(--sp-lg);
-		border-bottom: 1px solid var(--line);
-	}
-	.wordmark {
-		font-family: var(--font-wordmark);
-		font-size: 0.95rem;
-		font-weight: 400;
-		letter-spacing: 0.015em;
-		opacity: 0.7;
-	}
-
-	main {
-		flex: 1;
-	}
-
-	.hero {
-		padding-block: clamp(48px, 9vh, 104px);
-		max-width: 16ch;
-	}
-	h1 {
-		font-size: clamp(2.6rem, 6.5vw, 5.4rem);
-		line-height: 0.95;
-		letter-spacing: -0.045em;
-	}
-	h1 em {
-		font-style: italic;
-		color: var(--ink-muted);
-	}
-	.lead {
-		max-width: 46ch;
-		color: var(--ink-muted);
-		margin: var(--sp-xl) 0 0;
-		font-size: 0.95rem;
-		line-height: 1.7;
-	}
-	.hero-meta {
-		display: flex;
-		gap: var(--sp-sm);
-		margin-top: var(--sp-lg);
-	}
-
-	.quick {
+	/* KPI: сетка с 1px-зазорами, залитыми линией */
+	.kpi-grid {
 		display: grid;
-		grid-template-columns: 1.1fr 0.9fr;
-		gap: var(--sp-md);
-		padding-bottom: clamp(48px, 9vh, 104px);
-		border-top: 1px solid var(--line);
-		padding-top: var(--sp-lg);
+		grid-template-columns: repeat(4, 1fr);
+		gap: 1px;
+		background: var(--line);
+		border: 1px solid var(--line);
+		margin-bottom: var(--sp-lg);
 	}
-	.card-label {
-		font-size: 0.64rem;
-		letter-spacing: 0.16em;
+	.kpi {
+		background: var(--bg);
+		padding: var(--sp-md) var(--sp-lg);
+	}
+	.kpi-label {
+		margin: 0;
+		font-size: 0.66rem;
+		letter-spacing: 0.14em;
 		text-transform: uppercase;
 		color: var(--ink-muted);
-		margin: 0 0 var(--sp-md);
 	}
+	.kpi-value {
+		margin: var(--sp-xs) 0 0;
+		font-family: var(--font-display);
+		font-size: 1.9rem;
+		line-height: 1;
+		letter-spacing: -0.02em;
+	}
+
+	.panel {
+		background: var(--panel);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-card);
+		padding: clamp(18px, 2.4vw, 26px);
+		display: flex;
+		flex-direction: column;
+	}
+	.panel-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		padding-bottom: var(--sp-sm);
+		border-bottom: 1px solid var(--line);
+		margin-bottom: var(--sp-md);
+	}
+	.panel-title {
+		font-size: 1.35rem;
+		letter-spacing: -0.02em;
+	}
+
+	.grid-2 {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--sp-md);
+		margin-bottom: var(--sp-lg);
+	}
+
+	.empty {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		padding: var(--sp-xl) 0;
+	}
+	.spark {
+		width: 200px;
+		height: 60px;
+		margin-bottom: var(--sp-md);
+	}
+	.empty-title {
+		font-family: var(--font-display);
+		font-size: 1.35rem;
+		margin: 0;
+	}
+	.empty-desc {
+		margin: var(--sp-xs) 0 0;
+		font-size: 0.8rem;
+		color: var(--ink-muted);
+		max-width: 34ch;
+	}
+
 	textarea {
 		width: 100%;
 		background: transparent;
@@ -169,35 +226,77 @@
 	.hint {
 		font-size: 0.72rem;
 		color: var(--status-green);
-		letter-spacing: 0.08em;
 	}
-	ul {
+
+	.feed {
+		list-style: none;
 		margin: 0;
 		padding: 0;
-		list-style: none;
 	}
-	li {
-		padding: var(--sp-xs) 0;
+	.feed li {
+		display: flex;
+		align-items: center;
+		gap: var(--sp-md);
+		padding: var(--sp-sm) 0;
 		border-bottom: 1px solid var(--line);
-		color: var(--ink-muted);
-		font-size: 0.88rem;
 	}
-	li::before {
-		content: '·';
-		color: var(--accent);
-		margin-right: var(--sp-sm);
-	}
-	li:last-child {
+	.feed li:last-child {
 		border-bottom: none;
 	}
-
-	footer {
-		padding-top: var(--sp-lg);
-		border-top: 1px solid var(--line);
+	.feed-icon {
+		flex-shrink: 0;
+		width: 36px;
+		height: 36px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid var(--line);
+		border-radius: 9999px;
+		color: var(--ink-muted);
+		font-size: 0.9rem;
+	}
+	.feed-body {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.feed-title {
+		font-size: 0.88rem;
+	}
+	.feed-time {
+		font-size: 0.72rem;
+		color: var(--ink-muted);
 	}
 
-	@media (max-width: 640px) {
-		.quick {
+	.status-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.status-list li {
+		display: flex;
+		align-items: center;
+		gap: var(--sp-sm);
+		padding: var(--sp-xs) 0;
+		font-size: 0.86rem;
+		color: var(--ink-muted);
+	}
+	.dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 9999px;
+		background: var(--line-strong);
+		flex-shrink: 0;
+	}
+	.dot.ok {
+		background: var(--status-green);
+	}
+
+	@media (max-width: 900px) {
+		.kpi-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+		.grid-2 {
 			grid-template-columns: 1fr;
 		}
 	}
