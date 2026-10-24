@@ -8,7 +8,7 @@
 	let { values = [22, 26, 24, 31, 29, 36, 34, 42], title = 'Кривая капитала' } = $props();
 
 	const W = 300;
-	const H = 110;
+	const H = 143;
 	const PAD = 14;
 	const forecastFrom = 6;
 
@@ -128,7 +128,7 @@
 	.diagram {
 		display: block;
 		width: 100%;
-		max-height: 180px;
+		max-height: 234px;
 		height: auto;
 		overflow: visible;
 	}
