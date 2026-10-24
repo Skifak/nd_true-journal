@@ -25,3 +25,5 @@ vite.config.ts.timestamp-*
 # strix audit runs
 strix_runs/
 .strix/
+src-tauri/target/
+/src-tauri/gen/schemas/
