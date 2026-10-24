@@ -52,7 +52,6 @@
 			<span class="eyebrow">все сделки</span>
 		</div>
 		<EquityChart />
-		<p class="empty-desc" style="text-align:center; margin: var(--sp-sm) 0 0;">Демо-кривая. Добавьте первую сделку — график оживёт.</p>
 	</div>
 
 	<!-- Заметка дня -->

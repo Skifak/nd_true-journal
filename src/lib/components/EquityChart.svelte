@@ -1,31 +1,52 @@
 <script>
 	/**
-	 * Заглушка графика в стиле nf-diagram/nf-chart (ink-orbit-saas-template).
-	 * Полная ширина: viewBox строится по реальной ширине контейнера (1:1, без искажений).
-	 * Высота = 16% ширины, зажата в [190..300]px.
-	 * Интерактив: crosshair-вертикаль, точка и тултип при наведении (как в оригинале).
-	 * @type {{values?: number[], title?: string}}
+	 * График «Кривая капитала» в стиле nf-diagram/nf-chart (ink-orbit-saas-template).
+	 *
+	 * Данные из журнала: передай equity-значения точками и (опционально) даты.
+	 *   <EquityChart values={[1000, 1050, 980, 1120]} dates={['2025-01-05', ...]} />
+	 * values: числа (баланс после каждой закрытой сделки, по дням — как угодно).
+	 * dates: строки YYYY-MM-DD; если не заданы — генерируются последние n дней (демо).
+	 *
+	 * Оси: слева — % изменения от первого значения, снизу — даты.
+	 * Полная ширина (viewBox = реальные пиксели контейнера), высота ~17% ширины [200..320]px.
+	 * @type {{values?: number[], dates?: string[], title?: string}}
 	 */
-	let { values = [22, 26, 24, 31, 29, 36, 34, 42], title = 'Кривая капитала' } = $props();
+	let { values = [22, 26, 24, 31, 29, 36, 34, 42], dates = [], title = 'Кривая капитала' } = $props();
 
-	const PAD = 18;
-	const forecastFrom = 6;
+	const padT = 14;
+	const padB = 26;
+	const padL = 42;
+	const padR = 16;
 
 	// Реальная ширина контейнера → пиксельный viewBox (без леттербокса)
-	let wrapEl = $state(null);
 	let cw = $state(0);
-	const W = $derived(Math.max(320, Math.round(cw) || 640));
-	const H = $derived(Math.round(Math.min(300, Math.max(190, W * 0.16))));
+	const W = $derived(Math.max(340, Math.round(cw) || 720));
+	const H = $derived(Math.round(Math.min(320, Math.max(200, W * 0.17))));
+
+	// Даты: из журнала или демо-генерация (последние n дней)
+	const dateLabels = $derived.by(() => {
+		const n = values.length;
+		if (dates.length === n) return dates;
+		const out = [];
+		const today = new Date();
+		for (let i = n - 1; i >= 0; i--) {
+			const d = new Date(today);
+			d.setDate(d.getDate() - (n - 1 - i));
+			out.push(d.toISOString().slice(0, 10));
+		}
+		return out;
+	});
 
 	// Геометрия (формула zn() из оригинала: C-сглаживание)
 	const geometry = $derived.by(() => {
 		const vals = values.length > 1 ? values : [1, 2];
 		const n = vals.length;
 		const min = Math.min(...vals);
-		const range = Math.max(...vals) - min || 1;
+		const max = Math.max(...vals);
+		const range = max - min || 1;
 		const pts = vals.map((v, i) => [
-			PAD + (n < 2 ? 0 : (i / (n - 1)) * (W - PAD * 2)),
-			H - PAD - ((v - min) / range) * (H - PAD * 2)
+			padL + (n < 2 ? 0 : (i / (n - 1)) * (W - padL - padR)),
+			padT + (1 - (v - min) / range) * (H - padT - padB)
 		]);
 		let line = '';
 		pts.forEach(([x, y], i) => {
@@ -39,13 +60,39 @@
 		});
 		const area =
 			n > 0
-				? `${line} L${pts[n - 1][0].toFixed(1)},${H - PAD} L${pts[0][0].toFixed(1)},${H - PAD} Z`
+				? `${line} L${pts[n - 1][0].toFixed(1)},${H - padB} L${pts[0][0].toFixed(1)},${H - padB} Z`
 				: '';
-		return { line, area, pts };
+		return { line, area, pts, min, max };
 	});
 
 	const uid = $props.id();
 	const fcX = $derived(geometry.pts[Math.min(forecastFrom, geometry.pts.length - 1)][0]);
+
+	// Ось Y: 5 уровней значений → подпись в % от первого значения журнала
+	const yTicks = $derived.by(() => {
+		const { min, max } = geometry;
+		const ticks = [];
+		for (let i = 0; i <= 4; i++) {
+			const v = min + ((max - min) / 4) * i;
+			const y = padT + (1 - i / 4) * (H - padT - padB);
+			const base = values[0] || 1;
+			const pct = ((v - base) / base) * 100;
+			ticks.push({ y, label: (pct > 0 ? '+' : '') + pct.toFixed(0) + '%' });
+		}
+		return ticks;
+	});
+
+	// Ось X: до 6 дат, чтобы не толпились
+	const xTicks = $derived.by(() => {
+		const n = values.length;
+		const maxLabels = Math.min(6, Math.max(2, Math.floor(W / 110)));
+		const step = Math.max(1, Math.ceil(n / maxLabels));
+		const ticks = [];
+		for (let i = n - 1; i >= 0; i -= step) {
+			ticks.push({ x: geometry.pts[i][0], label: (dateLabels[i] ?? '').slice(5).split('-').reverse().join('.') });
+		}
+		return ticks.reverse();
+	});
 
 	// --- Интерактивность (как в оригинале: pointermove → ближайшая точка) ---
 	let hoverIdx = $state(-1);
@@ -66,31 +113,27 @@
 		hoverIdx = nearestX(((e.clientX - rect.left) / rect.width) * W);
 	}
 
-	// Подпись тултипа: дельта от первого значения в %
+	// Подпись тултипа: значение + дата точки
 	const delta = $derived.by(() => {
 		if (hoverIdx < 0) return '';
 		const v0 = values[0] || 1;
 		const d = Math.round(((values[hoverIdx] - v0) / v0) * 100);
-		return (
-			(hoverIdx >= forecastFrom ? 'pred ' : 'pt ' + (hoverIdx + 1) + ' ') +
-			(d >= 0 ? '+' : '') +
-			d +
-			'%'
-		);
+		const dl = (dateLabels[hoverIdx] ?? '').slice(5).split('-').reverse().join('.');
+		return (d >= 0 ? '+' : '') + d + '%' + (dl ? ' · ' + dl : '');
 	});
 
 	// Тултип не вылезает за края
-	const tipX = $derived(Math.min(W - 46, Math.max(46, active[0])));
-	const tipY = $derived(active[1] < 32 ? active[1] + 24 : active[1] - 14);
+	const tipX = $derived(Math.min(W - 70, Math.max(70, active[0])));
+	const tipY = $derived(active[1] < 34 ? active[1] + 26 : active[1] - 16);
 </script>
 
-<div class="wrap" bind:this={wrapEl} bind:clientWidth={cw}>
+<div class="wrap" bind:clientWidth={cw}>
 	{#if cw > 0}
 		<svg
 			class="diagram chart"
 			width={W}
-			height={H + 6}
-			viewBox="0 0 {W} {H + 6}"
+			height={H}
+			viewBox="0 0 {W} {H}"
 			role="img"
 			aria-label={title}
 			onpointermove={onMove}
@@ -103,8 +146,19 @@
 				</linearGradient>
 			</defs>
 
-			{#each [0.25, 0.5, 0.75] as f}
-				<line x1={PAD} x2={W - PAD} y1={H * f} y2={H * f} stroke="var(--line)" />
+			<!-- Сетка + шкала % слева -->
+			{#each yTicks as t, i}
+				<line
+					x1={padL}
+					x2={W - padR}
+					y1={t.y}
+					y2={t.y}
+					stroke="var(--line)"
+					opacity={i === 0 ? 0.5 : 1}
+				/>
+				<text x="6" y={t.y + 3} font-size="9" fill="var(--ink-muted)" font-family="var(--font-mono)"
+					>{t.label}</text
+				>
 			{/each}
 
 			<path d={geometry.area} fill="url(#{uid}-area)" />
@@ -118,18 +172,23 @@
 				opacity=".85"
 			/>
 
+			<!-- Шкала дат снизу -->
+			{#each xTicks as t}
+				<text
+					x={t.x}
+					y={H - 8}
+					text-anchor="middle"
+					font-size="9"
+					fill="var(--ink-muted)"
+					font-family="var(--font-mono)">{t.label}</text
+				>
+			{/each}
+
 			<!-- Пунктир прогноза -->
-			<line
-				x1={fcX}
-				x2={fcX}
-				y1="10"
-				y2={H - PAD}
-				stroke="var(--line-strong)"
-				stroke-dasharray="2 3"
-			/>
+			<line x1={fcX} x2={fcX} y1={padT} y2={H - padB} stroke="var(--line-strong)" stroke-dasharray="2 3" />
 			<text
 				x={fcX - 6}
-				y={H - 6}
+				y={padT + 9}
 				text-anchor="end"
 				font-size="9"
 				fill="var(--ink-muted)"
@@ -139,33 +198,19 @@
 
 			<!-- Кроссхейр при наведении -->
 			{#if hoverIdx >= 0}
-				<line
-					x1={active[0]}
-					x2={active[0]}
-					y1="10"
-					y2={H - PAD}
-					stroke="var(--sage)"
-					stroke-opacity=".35"
-				/>
+				<line x1={active[0]} x2={active[0]} y1={padT} y2={H - padB} stroke="var(--sage)" stroke-opacity=".35" />
 			{/if}
 
 			<!-- Точка: покой (пульс) или активная -->
 			{#if hoverIdx < 0}
 				<circle cx={active[0]} cy={active[1]} r="8" fill="var(--sage)" opacity=".15" class="glow" />
 			{/if}
-			<circle
-				cx={active[0]}
-				cy={active[1]}
-				r="3.6"
-				fill="var(--bg)"
-				stroke="var(--sage)"
-				stroke-width="1.5"
-			/>
+			<circle cx={active[0]} cy={active[1]} r="3.6" fill="var(--bg)" stroke="var(--sage)" stroke-width="1.5" />
 
 			<!-- Тултип -->
 			{#if hoverIdx >= 0}
 				<g transform="translate({tipX},{tipY})">
-					<rect x="-36" y="-12" width="72" height="16" rx="2" fill="var(--ink)" />
+					<rect x="-64" y="-12" width="128" height="16" rx="2" fill="var(--ink)" />
 					<text x="0" y="-1" text-anchor="middle" font-size="8.5" fill="var(--bg)" font-family="var(--font-mono)"
 						>{delta}</text
 					>
@@ -178,7 +223,7 @@
 <style>
 	.wrap {
 		width: 100%;
-		min-height: 120px;
+		min-height: 140px;
 	}
 	.diagram {
 		display: block;
