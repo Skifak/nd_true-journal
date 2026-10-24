@@ -1,6 +1,7 @@
 <script>
 	import { detectPlatform, isTauri } from '#lib/platform/index.js';
 	import { namespaced } from '#lib/storage/local.js';
+	import EquityChart from '#lib/components/EquityChart.svelte';
 
 	const app = namespaced('ndtj:app:');
 
@@ -50,14 +51,8 @@
 			<h2 class="panel-title">Кривая капитала</h2>
 			<span class="eyebrow">все сделки</span>
 		</div>
-		<div class="empty">
-			<svg viewBox="0 0 200 60" class="spark" aria-hidden="true">
-				<line x1="0" y1="30" x2="200" y2="30" stroke="var(--line)" stroke-dasharray="2 4" />
-				<path d="M0 30 C 30 26, 50 34, 80 30 S 140 24, 200 30" fill="none" stroke="var(--sage)" stroke-width="1" opacity="0.6" />
-			</svg>
-			<p class="empty-title">Пока пусто</p>
-			<p class="empty-desc">Добавьте первую сделку — кривая начнёт рисоваться.</p>
-		</div>
+		<EquityChart />
+		<p class="empty-desc" style="text-align:center; margin: var(--sp-sm) 0 0;">Демо-кривая. Добавьте первую сделку — график оживёт.</p>
 	</div>
 
 	<!-- Заметка дня -->
