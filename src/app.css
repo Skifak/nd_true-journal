@@ -228,3 +228,59 @@ button {
 		transition-duration: 0.01ms !important;
 	}
 }
+
+/* ---------- Frame hover (из ink-orbit-saas-template, 21st.dev)
+   Четыре угловые скобки вокруг блока; при наведении светлеют
+   и разъезжаются по диагоналям. Цвета — палитра журнала. ---------- */
+.frame-hover {
+	position: relative;
+}
+.fh-c {
+	position: absolute;
+	width: 12px;
+	height: 12px;
+	border: 0 solid var(--line);
+	pointer-events: none;
+	transition:
+		border-color 0.3s,
+		transform 0.35s var(--ease-out);
+}
+.fh-tl {
+	top: -6px;
+	left: -6px;
+	border-top-width: 1.5px;
+	border-left-width: 1.5px;
+}
+.fh-tr {
+	top: -6px;
+	right: -6px;
+	border-top-width: 1.5px;
+	border-right-width: 1.5px;
+}
+.fh-bl {
+	bottom: -6px;
+	left: -6px;
+	border-bottom-width: 1.5px;
+	border-left-width: 1.5px;
+}
+.fh-br {
+	bottom: -6px;
+	right: -6px;
+	border-bottom-width: 1.5px;
+	border-right-width: 1.5px;
+}
+.frame-hover:hover > .fh-c {
+	border-color: var(--ink);
+}
+.frame-hover:hover > .fh-tl {
+	transform: translate(-3px, -3px);
+}
+.frame-hover:hover > .fh-tr {
+	transform: translate(3px, -3px);
+}
+.frame-hover:hover > .fh-bl {
+	transform: translate(-3px, 3px);
+}
+.frame-hover:hover > .fh-br {
+	transform: translate(3px, 3px);
+}

@@ -41,7 +41,11 @@
 
 <section class="grid-2">
 	<!-- График-заглушка: кривая equity на SVG -->
-	<div class="panel">
+	<div class="panel frame-hover">
+		<span class="fh-c fh-tl" aria-hidden="true"></span>
+		<span class="fh-c fh-tr" aria-hidden="true"></span>
+		<span class="fh-c fh-bl" aria-hidden="true"></span>
+		<span class="fh-c fh-br" aria-hidden="true"></span>
 		<div class="panel-head">
 			<h2 class="panel-title">Кривая капитала</h2>
 			<span class="eyebrow">все сделки</span>
@@ -57,7 +61,11 @@
 	</div>
 
 	<!-- Заметка дня -->
-	<div class="panel">
+	<div class="panel frame-hover">
+		<span class="fh-c fh-tl" aria-hidden="true"></span>
+		<span class="fh-c fh-tr" aria-hidden="true"></span>
+		<span class="fh-c fh-bl" aria-hidden="true"></span>
+		<span class="fh-c fh-br" aria-hidden="true"></span>
 		<div class="panel-head">
 			<h2 class="panel-title">Заметка дня</h2>
 			<span class="eyebrow">локально</span>
@@ -72,7 +80,11 @@
 
 <section class="grid-2">
 	<!-- Активность -->
-	<div class="panel">
+	<div class="panel frame-hover">
+		<span class="fh-c fh-tl" aria-hidden="true"></span>
+		<span class="fh-c fh-tr" aria-hidden="true"></span>
+		<span class="fh-c fh-bl" aria-hidden="true"></span>
+		<span class="fh-c fh-br" aria-hidden="true"></span>
 		<div class="panel-head">
 			<h2 class="panel-title">Активность</h2>
 			<span class="eyebrow">последние события</span>
@@ -91,7 +103,11 @@
 	</div>
 
 	<!-- Состояние системы -->
-	<div class="panel">
+	<div class="panel frame-hover">
+		<span class="fh-c fh-tl" aria-hidden="true"></span>
+		<span class="fh-c fh-tr" aria-hidden="true"></span>
+		<span class="fh-c fh-bl" aria-hidden="true"></span>
+		<span class="fh-c fh-br" aria-hidden="true"></span>
 		<div class="panel-head">
 			<h2 class="panel-title">Состояние</h2>
 			<span class="eyebrow">безопасность</span>
