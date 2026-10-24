@@ -1,51 +1,41 @@
 <script lang="ts">
 	import LineChart from './LineChart.svelte';
+	import type { EquityCurve } from '#lib/domain/journal.ts';
 
 	interface Props {
-		values?: number[];
-		dates?: string[];
+		curve?: EquityCurve | null;
 		title?: string;
 		heightRatio?: number;
-		forecast?: { from: number; label: string } | null;
-		/** Домен оси Y в «сырых» единицах; по умолчанию шкала 0..100% от старта */
-		yMin?: number | null;
-		yMax?: number | null;
 	}
 
-	let {
-		values = [22, 26, 24, 31, 29, 36, 34, 42],
-		dates = [],
-		title = 'Кривая капитала',
-		heightRatio = 0.17,
-		forecast = { from: 0.75, label: 'FORECAST' },
-		yMin = null,
-		yMax = null
-	}: Props = $props();
+	let { curve = null, title = 'Кривая капитала', heightRatio = 0.17 }: Props = $props();
 
-	// Дата из YYYY-MM-DD → dd.mm (компактно для оси X)
-	const shortDates = $derived(
-		dates.map((d) => (d ?? '').slice(5).split('-').reverse().join('.'))
-	);
+	// Один сэмпл — нужны две точки, чтобы линия вообще была
+	const values = $derived(curve && curve.values.length > 1 ? curve.values : [0, 0]);
+	const dates = $derived(curve && curve.values.length > 1 ? curve.dates : []);
+
+	// Компактные подписи: разные месяцы → 'мм.гг', один месяц → 'дд'
+	const shortDates = $derived.by(() => {
+		const months = new Set(dates.map((d) => d.slice(0, 7)));
+		const sameMonth = months.size <= 1;
+		return dates.map((d) => (sameMonth ? d.slice(8) : d.slice(5).split('-').reverse().join('.')));
+	});
 </script>
 
 <LineChart
 	{values}
-	labels={shortDates}
+	labels={shortDates.length === values.length ? shortDates : []}
 	{heightRatio}
 	ariaLabel={title}
-	{forecast}
-	{yMin}
-	{yMax}
+	forecast={null}
 	yFormat={(v, base) => {
-		// Если домен задан в процентах (0..100) — печатаем как есть
-		if (yMin !== null && yMax !== null) return Math.round(v) + '%';
 		const pct = ((v - base) / (base || 1)) * 100;
 		return (pct > 0 ? '+' : '') + pct.toFixed(0) + '%';
 	}}
 	tipFormat={(v, i, base) => {
-		if (yMin !== null && yMax !== null) return Math.round(v) + '%';
 		const pct = ((v - base) / (base || 1)) * 100;
 		const d = Math.round(pct);
-		return (d >= 0 ? '+' : '') + d + '%';
+		const money = v.toFixed(2) + ' $';
+		return money + ' · ' + (d >= 0 ? '+' : '') + d + '%';
 	}}
 />

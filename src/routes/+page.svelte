@@ -1,35 +1,54 @@
 <script lang="ts">
 	import { detectPlatform, isTauri } from '#lib/platform/index.ts';
 	import { namespaced } from '#lib/storage/local.ts';
+	import { getTrades, initJournal, journalState } from '#lib/storage/journalStore.svelte.ts';
+	import { equityCurve } from '#lib/domain/journal.ts';
+	import { formatMoney, parseStamp, tradeProfit } from '#lib/domain/trades.ts';
 	import EquityChart from '#lib/components/EquityChart.svelte';
 	import PanelToggle from '#lib/components/PanelToggle.svelte';
+
+	const app = namespaced('ndtj:app:');
 
 	// График: 2 состояния — компактный / развёрнутый (кнопка в шапке панели)
 	const RATIO_COMPACT = 0.14;
 	const RATIO_EXPANDED = 0.26;
-	let chartExpanded = $state(false);
+	let chartExpanded = $state(app.get('chartExpanded') === '1');
+	$effect(() => app.set('chartExpanded', chartExpanded ? '1' : '0'));
 
-	// Демо-наборы данных для оценки графика (значения — % от старта, шкала 0..100)
-	const CHART_DATASETS = [
-		{
-			id: 'smooth',
-			label: 'ровный',
-			values: [0, 8, 14, 21, 27, 34, 40, 47, 53, 61, 68, 74]
-		},
-		{
-			id: 'volatile',
-			label: 'волатильный',
-			values: [12, 5, 28, 19, 44, 31, 58, 42, 71, 55, 88, 79]
-		},
-		{
-			id: 'drawdown',
-			label: 'просадка',
-			values: [18, 34, 52, 66, 81, 74, 58, 41, 26, 33, 45, 62]
-		}
-	];
-	let chartDataset = $state(0);
+	// Периоды: окно в днях от текущего дня; null — вся история
+	const RANGES = [
+		{ id: 'week', label: 'Неделя', days: 7 },
+		{ id: 'month', label: 'Месяц', days: 30 },
+		{ id: 'quarter', label: 'Квартал', days: 90 },
+		{ id: 'year', label: 'Год', days: 365 },
+		{ id: 'all', label: 'Вся история', days: null }
+	] as const;
+	// Сохранённый период; неизвестный id или первый запуск → вся история
+	const DEFAULT_RANGE = RANGES.length - 1;
+	const savedRangeIdx = RANGES.findIndex((r) => r.id === app.get('range'));
+	let rangeIdx = $state(savedRangeIdx < 0 ? DEFAULT_RANGE : savedRangeIdx);
+	$effect(() => app.set('range', RANGES[rangeIdx].id));
 
-	const app = namespaced('ndtj:app:');
+	let allTrades = $derived(getTrades());
+
+	// Граница выбранного периода — одна для графика и KPI
+	const since = $derived.by(() => {
+		const days = RANGES[rangeIdx].days;
+		return days == null ? undefined : Date.now() - days * 86_400_000;
+	});
+
+	const periodTrades = $derived(
+		since == null
+			? allTrades
+			: allTrades.filter(
+					(t) => (parseStamp(t.dateClose || t.dateOpen)?.getTime() ?? 0) >= since
+				)
+	);
+
+	let curve = $derived(equityCurve(allTrades, 0, since));
+	const rangeEmpty = $derived(curve.values.length < 2);
+
+	initJournal();
 
 	let platform = $state(detectPlatform());
 	let note = $state(app.get('note') ?? '');
@@ -41,25 +60,43 @@
 		setTimeout(() => (saved = ''), 2500);
 	}
 
-	// KPI-метрики — демо-данные до подключения реального источника
-	const kpis = [
-		{ label: 'Баланс', value: '0,00 $', delta: null },
-		{ label: 'Сделок за месяц', value: '0', delta: null },
-		{ label: 'Winrate', value: '—', delta: null },
-		{ label: 'Дисциплина', value: '—', delta: null }
-	];
+	// KPI-метрики — по сделкам выбранного периода
+	const kpis = $derived.by(() => {
+		const trades = periodTrades;
+		const balance = trades.reduce((sum, t) => sum + tradeProfit(t), 0);
+		const decided = trades.filter((t) => t.status === 'closed' && tradeProfit(t) !== 0);
+		const wins = decided.filter((t) => tradeProfit(t) > 0).length;
 
-	// Демо-события до подключения реального журнала активности
-	const activity = [
-		{ icon: '＋', title: 'Журнал создан', time: 'только что' },
-		{ icon: '◈', title: 'Платформа: ' + detectPlatform(), time: 'при запуске' },
-		{ icon: '◇', title: 'Данные хранятся локально', time: 'постоянно' }
-	];
+		return [
+			{ label: 'Баланс', value: trades.length ? formatMoney(balance, 'USD', true) : '—' },
+			{ label: 'Сделок', value: String(trades.length) },
+			{
+				label: 'Winrate',
+				value: decided.length ? Math.round((wins / decided.length) * 100) + '%' : '—'
+			},
+			{ label: 'Сделок всего', value: String(allTrades.length) }
+		];
+	});
+
+	// Лента активности — реальный журнал: последние сделки
+	const activity = $derived.by(() =>
+		[...allTrades]
+			.sort(
+				(a, b) =>
+					(parseStamp(b.dateClose || b.dateOpen)?.getTime() ?? 0) -
+					(parseStamp(a.dateClose || a.dateOpen)?.getTime() ?? 0)
+			)
+			.slice(0, 5)
+			.map((t) => ({
+				icon: t.direction === 'short' ? '↓' : '↑',
+				title: `${t.pair} · ${t.volume} лот · ${tradeProfit(t) >= 0 ? '+' : '−'}${formatMoney(Math.abs(tradeProfit(t)))}`,
+				time: parseStamp(t.dateClose || t.dateOpen)?.toISOString().slice(0, 10) ?? ''
+			}))
+	);
 </script>
 
 <!-- KPI-сетка: плотная, с волосяными gap-px разделителями -->
-<section class="kpi-grid" aria-label="Ключевые показатели (демо-данные)">
-	<div class="demo-flag"><span class="eyebrow">демо-данные</span></div>
+<section class="kpi-grid" aria-label="Ключевые показатели">
 	{#each kpis as kpi}
 		<div class="kpi">
 			<p class="kpi-label">{kpi.label}</p>
@@ -69,7 +106,7 @@
 </section>
 
 <section class="grid-2">
-	<!-- График-заглушка: кривая equity на SVG -->
+	<!-- График: кривая капитала -->
 	<div class="panel frame-hover">
 		<span class="fh-c fh-tl" aria-hidden="true"></span>
 		<span class="fh-c fh-tr" aria-hidden="true"></span>
@@ -83,26 +120,29 @@
 					labelExpand="Развернуть график"
 					labelCollapse="Свернуть график"
 				/>
-				<span class="eyebrow">демо · все сделки</span>
+				<span class="eyebrow">{journalState.count} сделок</span>
 			</div>
 		</div>
 		<div class="chart-slot">
-			<EquityChart
-				values={CHART_DATASETS[chartDataset].values}
-				yMin={0}
-				yMax={100}
-				forecast={null}
-				heightRatio={chartExpanded ? RATIO_EXPANDED : RATIO_COMPACT}
-			/>
+			{#if rangeEmpty}
+				<p class="chart-empty">
+					{journalState.loading ? 'Загрузка…' : 'Нет закрытых сделок за период'}
+				</p>
+			{:else}
+				<EquityChart
+					{curve}
+					heightRatio={chartExpanded ? RATIO_EXPANDED : RATIO_COMPACT}
+				/>
+			{/if}
 		</div>
-		<div class="chart-sets" role="group" aria-label="Наборы данных графика">
-			{#each CHART_DATASETS as ds, i}
+		<div class="chart-sets" role="group" aria-label="Период графика">
+			{#each RANGES as r, i}
 				<button
 					type="button"
 					class="set-btn"
-					class:active={i === chartDataset}
-					aria-pressed={i === chartDataset}
-					onclick={() => (chartDataset = i)}>{ds.label}</button
+					class:active={i === rangeIdx}
+					aria-pressed={i === rangeIdx}
+					onclick={() => (rangeIdx = i)}>{r.label}</button
 				>
 			{/each}
 		</div>
@@ -135,19 +175,23 @@
 		<span class="fh-c fh-br" aria-hidden="true"></span>
 		<div class="panel-head">
 			<h2 class="panel-title">Активность</h2>
-			<span class="eyebrow">демо</span>
+			<span class="eyebrow">последние сделки</span>
 		</div>
-		<ul class="feed">
-			{#each activity as a}
-				<li>
-					<span class="feed-icon">{a.icon}</span>
-					<span class="feed-body">
-						<span class="feed-title">{a.title}</span>
-						<span class="feed-time">{a.time}</span>
-					</span>
-				</li>
-			{/each}
-		</ul>
+		{#if activity.length}
+			<ul class="feed">
+				{#each activity as a}
+					<li>
+						<span class="feed-icon">{a.icon}</span>
+						<span class="feed-body">
+							<span class="feed-title">{a.title}</span>
+							<span class="feed-time">{a.time}</span>
+						</span>
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<p class="panel-empty">Сделок пока нет</p>
+		{/if}
 	</div>
 
 	<!-- Состояние системы -->
@@ -179,13 +223,6 @@
 		background: var(--line);
 		border: 1px solid var(--line);
 		margin-bottom: var(--sp-xl);
-	}
-	.demo-flag {
-		position: absolute;
-		top: 6px;
-		right: 10px;
-		opacity: 0.6;
-		z-index: 1;
 	}
 	.kpi {
 		background: var(--bg);
@@ -229,6 +266,15 @@
 	}
 	.chart-slot {
 		transition: opacity 0.3s var(--ease-out, ease);
+	}
+	.chart-empty {
+		margin: 0;
+		padding: 2.5rem 0;
+		text-align: center;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		letter-spacing: 0.06em;
+		color: var(--ink-muted);
 	}
 	.chart-sets {
 		display: flex;
@@ -302,6 +348,15 @@
 	.hint {
 		font-size: 0.72rem;
 		color: var(--status-green);
+	}
+
+	.panel-empty {
+		margin: 0;
+		padding: 2rem 0;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		letter-spacing: 0.06em;
+		color: var(--ink-muted);
 	}
 
 	.feed {

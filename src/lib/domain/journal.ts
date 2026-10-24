@@ -2,7 +2,7 @@
  * Фильтрация, сортировка и агрегаты для списка сделок.
  * Чистые функции: зависят только от переданных аргументов.
  */
-import { dayKey, tradeProfit, tradeSource, type Trade } from './trades.ts';
+import { dayKey, parseStamp, tradeProfit, tradeSource, type Trade } from './trades.ts';
 
 export interface Filters {
 	symbolFilter: string;
@@ -197,21 +197,33 @@ export interface EquityCurve {
 	values: number[];
 	dates: string[];
 	labels: string[];
+	times: number[];
 }
 
-/** Кривая капитала: накопительный P/L по закрытым сделкам. */
-export function equityCurve(trades: Trade[], startBalance = 0): EquityCurve {
-	const closed = trades.filter((t) => t.status === 'closed');
+/**
+ * Кривая капитала: накопительный P/L по закрытым сделкам.
+ * `since` обрезает историю — баланс считается с нуля на границе периода.
+ */
+export function equityCurve(trades: Trade[], startBalance = 0, since?: number): EquityCurve {
+	const closed = trades
+		.filter((t) => t.status === 'closed')
+		.map((t) => ({ t, at: parseStamp(t.dateClose || t.dateOpen)?.getTime() ?? 0 }))
+		.filter(({ at }) => !since || at >= since)
+		.sort((a, b) => a.at - b.at);
+
+	const first = since ?? closed[0]?.at ?? 0;
 	let balance = Number(startBalance) || 0;
 	const values: number[] = [balance];
-	const dates: string[] = [];
-	const labels: string[] = [];
-	for (const t of closed) {
+	const dates: string[] = [since ? dayKey(new Date(first)) || '' : ''];
+	const labels: string[] = [since ? dates[0].slice(5).split('-').reverse().join('.') : ''];
+	const times: number[] = [first];
+	for (const { t, at } of closed) {
 		balance += tradeProfit(t);
 		values.push(Number(balance.toFixed(2)));
 		const dk = dayKey(t.dateClose || t.dateOpen) || '';
 		dates.push(dk);
 		labels.push(dk.slice(5).split('-').reverse().join('.'));
+		times.push(at);
 	}
-	return { values, dates, labels };
+	return { values, dates, labels, times };
 }

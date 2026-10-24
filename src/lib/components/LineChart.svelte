@@ -81,19 +81,8 @@
 	const safeValues = $derived(values.length > 1 ? values : [0, 0]);
 	const base = $derived(safeValues[0] ?? 0);
 
-	// Подписи X: из labels или демо-даты (последние n дней)
-	const xLabels = $derived.by(() => {
-		const n = safeValues.length;
-		if (labels.length === n) return labels;
-		const out = [];
-		const today = new Date();
-		for (let i = n - 1; i >= 0; i--) {
-			const d = new Date(today);
-			d.setDate(d.getDate() - (n - 1 - i));
-			out.push(d.toISOString().slice(0, 10));
-		}
-		return out;
-	});
+	// Подписи X: только из labels — без них ось остаётся пустой
+	const xLabels: string[] = $derived(labels.length === safeValues.length ? labels : []);
 
 	// Геометрия (формула zn() из оригинала: C-сглаживание)
 	const geometry = $derived.by(() => {

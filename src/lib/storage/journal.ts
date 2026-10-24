@@ -11,7 +11,6 @@ import { isTauri, invoke } from '../platform/index.ts';
 import type { Trade } from '../domain/trades.ts';
 import { namespaced } from './local.ts';
 import { normalizeTrade } from '../domain/trades.ts';
-import { demoMt5Report } from '../domain/mt5.ts';
 
 const KEY = 'journalData_v1';
 const FILE = 'journal.json';
@@ -36,7 +35,7 @@ async function readRaw(): Promise<{ data: JournalPayload | null; failed: boolean
 			// файла ещё нет — чистый первый запуск
 			return { data: null, failed: false };
 		} catch (e) {
-			// реальная ошибка хранилища: не сеем демо поверх данных пользователя
+			// реальная ошибка хранилища: не выдаём её за пустой журнал
 			console.error('journal.read (tauri) failed', e);
 			return { data: null, failed: true };
 		}
@@ -64,16 +63,11 @@ async function writeRaw(data: JournalPayload): Promise<void> {
 	ns.set(KEY, payload);
 }
 
-/** Загрузить журнал. При первом запуске — демо-набор, чтобы интерфейс был живым. */
-export async function loadTrades({ seedDemo = true }: { seedDemo?: boolean } = {}): Promise<Trade[]> {
-	const { data, failed } = await readRaw();
-	if (data && Array.isArray(data.trades)) {
-		return data.trades.map(normalizeTrade);
-	}
-	if (failed || !seedDemo) return [];
-	const seed = demoMt5Report(28);
-	await writeRaw({ version: SCHEMA_VERSION, trades: seed });
-	return seed.map(normalizeTrade);
+/** Загрузить журнал. Пустой/отсутствующий файл — честный пустой журнал. */
+export async function loadTrades(): Promise<Trade[]> {
+	const { data } = await readRaw();
+	if (data && Array.isArray(data.trades)) return data.trades.map(normalizeTrade);
+	return [];
 }
 
 /** Сохранить список сделок. */

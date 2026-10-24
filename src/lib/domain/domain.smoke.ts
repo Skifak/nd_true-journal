@@ -13,7 +13,7 @@ try {
 
 import { calculateProfit, tradeProfit, calculatePips, normalizeTrade, formatMoney, formatDuration, dayKey, type Trade } from './trades.ts';
 import { filterTrades, sortTrades, computeTotals, groupByDay, equityCurve, emptyFilters } from './journal.ts';
-import { parseMt5Report, parseNumber, parseMt5Date, demoMt5Report, decodeMt5Html } from './mt5.ts';
+import { parseMt5Report, parseNumber, parseMt5Date, decodeMt5Html } from './mt5.ts';
 
 let pass = 0, fail = 0;
 const eq = (name: string, a: unknown, b: unknown) => {
@@ -68,6 +68,13 @@ eq('groups', groupByDay(trades).length, 3);
 const eqc = equityCurve(trades, 1000);
 eq('equity len', eqc.values.length, 3);
 eq('equity last', eqc.values[2], 1900);
+
+// порядок по времени закрытия, а не по порядку массива
+eq('equity sorts by time', equityCurve([...trades].reverse(), 0).values, [0, 1000, 900]);
+// период: всё до границы отбрасывается, стартовая точка — на границе
+const windowed = equityCurve(trades, 0, Date.parse('2026-01-06T00:00:00'));
+eq('equity since values', windowed.values, [0, -100]);
+eq('equity since dates', windowed.dates, ['', '2026-01-06']);
 
 // MT5 HTML: реальная разметка терминала (секция = <tr><th><b>Имя</b></th></tr>,
 // строки данных — <tr bgcolor=...>, подпись колонок «Прибыль» с colspan=2)
@@ -132,7 +139,6 @@ for (const ch of src) {
 }
 eq('decode utf16 bom', decodeMt5Html(new Uint8Array(u16).buffer), src);
 eq('decode utf8', decodeMt5Html(enc.encode('<html>ok</html>').buffer), '<html>ok</html>');
-eq('demo gen', demoMt5Report(10).length, 10);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

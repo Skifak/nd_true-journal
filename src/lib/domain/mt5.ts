@@ -11,8 +11,7 @@ type ImportedTrade = Trade & { templateUsed: null };
  * те же правила секций, колонок и метаданных. Отличия — только инфраструктурные:
  *  1) добавлен `decodeMr5Html` — старый журнал читал файл через FileReader.readAsText
  *     и получал кракозябры на UTF-16-отчётах;
- *  2) добавлен `demoMt5Report` — демо-данные для nd-журнала;
- *  3) сохранён экспорт `parseNumber` / `parseMt5Date` для тестов домена.
+ *  2) сохранён экспорт `parseNumber` / `parseMt5Date` для тестов домена.
  */
 
 function cleanText(value: unknown): string {
@@ -587,61 +586,4 @@ export function decodeMt5Html(buf: ArrayBuffer): string {
 		return new TextDecoder(littleEndian ? 'utf-16le' : 'utf-16be').decode(bytes);
 	}
 	return new TextDecoder('utf-8').decode(bytes);
-}
-
-export function demoMt5Report(count = 24): Trade[] {
-	const pairs = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY', 'US100', 'GBPJPY'];
-	const comments = [
-		'FVG + OTE вход в лондонскую сессию',
-		'Silver Bullet 10–11 NY',
-		'Sweep PDH, разворот на MSS',
-		'Продолжение тренда после ретеста',
-		'Стоп по структуре, вышел в минус',
-		'Частичный фикс на 2R'
-	];
-		const out: Trade[] = [];
-	const now = new Date();
-	for (let i = 0; i < count; i++) {
-		const pair = pairs[i % pairs.length];
-		const dir = i % 3 === 0 ? 'short' : 'long';
-		const base =
-			pair.startsWith('XAU') ? 2340 : pair.startsWith('US100') ? 18450 : pair === 'USDJPY' ? 157.2 : 1.084;
-		const pip = pair.startsWith('XAU') ? 0.1 : pair === 'USDJPY' ? 0.01 : 0.0001;
-		const win = Math.random() > 0.38;
-		const move = (win ? 1 : -1) * (20 + Math.floor(Math.random() * 60)) * pip;
-		const openDate = new Date(now);
-		openDate.setDate(openDate.getDate() - Math.floor(i / 3));
-		openDate.setHours(9 + (i % 8), (i * 7) % 60, 0, 0);
-		const closeDate = new Date(openDate.getTime() + (25 + (i % 90)) * 60000);
-		const volume = [0.01, 0.02, 0.05, 0.1][i % 4];
-		const priceOpen = Number((base + (Math.random() - 0.5) * base * 0.004).toFixed(5));
-		const priceClose = Number((priceOpen + (dir === 'long' ? move : -move)).toFixed(5));
-		out.push({
-			id: `demo-${i}-${Math.random().toString(36).slice(2, 10)}`,
-			dateOpen: stampOf(openDate),
-			dateOpenManual: true,
-			pair,
-			direction: dir,
-			volume,
-			priceOpen,
-			sl: Number((priceOpen + (dir === 'long' ? -pip * 30 : pip * 30)).toFixed(5)),
-			tp: Number((priceOpen + (dir === 'long' ? pip * 90 : -pip * 90)).toFixed(5)),
-			status: 'closed',
-			dateClose: stampOf(closeDate),
-			priceClose,
-			commission: Number((volume * 7).toFixed(2)) * -1,
-			swap: 0,
-			profit: null,
-			contractSize: null,
-			tags: ['mt5-history-report'],
-			comment: comments[i % comments.length],
-			attachments: []
-		});
-	}
-	return out;
-}
-
-function stampOf(date: Date): string {
-	const p = (n: number) => String(n).padStart(2, '0');
-	return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
 }
