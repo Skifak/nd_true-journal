@@ -21,9 +21,41 @@
 	// Индекс, с которого начинается пунктир «FORECAST» (по умолчанию — 75% точек)
 	const forecastFrom = $derived(Math.max(1, Math.round(values.length * 0.75)));
 
-	// Реальная ширина контейнера → пиксельный viewBox (без леттербокса)
-	let cw = $state(0);
-	const W = $derived(Math.max(340, Math.round(cw) || 720));
+	// Замер реального размера контейнера (аналог useDimensions из оригинала):
+	// ResizeObserver + debounce 250 мс после окончания ресайза.
+	const DEBOUNCE_MS = 250;
+	let wrapEl = $state(null);
+	let measured = $state({ width: 0, height: 0 });
+	let debounceId;
+
+	$effect(() => {
+		if (!wrapEl) return;
+
+		const update = () => {
+			if (!wrapEl) return;
+			const r = wrapEl.getBoundingClientRect();
+			measured = { width: r.width, height: r.height };
+		};
+
+		const debounced = () => {
+			clearTimeout(debounceId);
+			debounceId = setTimeout(update, DEBOUNCE_MS);
+		};
+
+		update(); // первичный замер — сразу, без задержки
+		const ro = new ResizeObserver(debounced);
+		ro.observe(wrapEl);
+		window.addEventListener('resize', debounced);
+
+		return () => {
+			ro.disconnect();
+			window.removeEventListener('resize', debounced);
+			clearTimeout(debounceId);
+		};
+	});
+
+	// Ширина/высота в пикселях → viewBox 1:1 (без леттербокса)
+	const W = $derived(Math.max(340, Math.round(measured.width) || 720));
 	const H = $derived(Math.round(Math.min(320, Math.max(200, W * 0.17))));
 
 	// Даты: из журнала или демо-генерация (последние n дней)
@@ -130,8 +162,8 @@
 	const tipY = $derived(active[1] < 34 ? active[1] + 26 : active[1] - 16);
 </script>
 
-<div class="wrap" bind:clientWidth={cw}>
-	{#if cw > 0}
+<div class="wrap" bind:this={wrapEl}>
+	{#if measured.width > 0}
 		<svg
 			class="diagram chart"
 			width={W}
