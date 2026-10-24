@@ -1,0 +1,33 @@
+{
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "nd-true-journal",
+	"version": "0.1.0",
+	"identifier": "app.ndtrue.journal",
+	"build": {
+		"beforeDevCommand": "npm run dev",
+		"devUrl": "http://localhost:5173",
+		"beforeBuildCommand": "npm run build",
+		"frontendDist": "../build"
+	},
+	"app": {
+		"withGlobalTauri": true,
+		"windows": [
+			{
+				"title": "nd true journal",
+				"width": 1200,
+				"height": 800,
+				"minWidth": 800,
+				"minHeight": 600,
+				"center": true
+			}
+		],
+		"security": {
+			"csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: ipc: http://ipc.localhost; media-src 'self' blob: data:; font-src 'self'; connect-src ipc: http://ipc.localhost; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
+		}
+	},
+	"bundle": {
+		"active": true,
+		"targets": ["msi", "nsis", "appimage", "deb"],
+		"icon": []
+	}
+}

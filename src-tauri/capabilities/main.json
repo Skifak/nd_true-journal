@@ -1,0 +1,11 @@
+{
+	"$schema": "gen/schemas/desktop-schema.json",
+	"identifier": "main-capability",
+	"description": "Минимальные разрешения для основного окна: IPC-команды приложения и opener.",
+	"windows": ["main"],
+	"permissions": [
+		"core:default",
+		"core:window:allow-set-title",
+		"opener:default"
+	]
+}
