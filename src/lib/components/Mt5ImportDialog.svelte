@@ -34,6 +34,10 @@
 
 	async function handleFile(file: File) {
 		if (!file) return;
+		if (file.size > 10 * 1024 * 1024) {
+			errMsg = 'Файл больше 10 МБ — похоже, это не отчёт MT5';
+			return;
+		}
 		busy = true;
 		errMsg = '';
 		fileName = file.name;

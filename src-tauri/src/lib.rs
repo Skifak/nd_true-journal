@@ -32,16 +32,13 @@ fn validate_rel_path(p: &str) -> Result<PathBuf, String> {
     if path.is_absolute() {
         return Err("абсолютные пути запрещены".into());
     }
-    let mut has_component = false;
     for c in path.components() {
         match c {
-            Component::Normal(_) => has_component = true,
+            Component::Normal(_) => {}
             Component::CurDir => {}
+            // пустой путь (без компонентов) разрешён: это корень хранилища для листинга
             _ => return Err("путь содержит запрещённые компоненты (.., /, корень)".into()),
         }
-    }
-    if !has_component {
-        return Err("пустой путь".into());
     }
     Ok(path.to_path_buf())
 }
@@ -53,16 +50,13 @@ fn resolve_in_app_data(app: &tauri::AppHandle, rel: &str) -> Result<PathBuf, Str
         .app_data_dir()
         .map_err(|e| format!("нет app_data_dir: {e}"))?;
     let full = base.join(validate_rel_path(rel)?);
-    // Финальная проверка: итоговый путь обязан лежать внутри base
+    // base обязан существовать: канонизируем якорь, относительно которого проверяем containment
+    fs::create_dir_all(&base).map_err(|e| format!("base: {e}"))?;
     let canonical_base = base.canonicalize().map_err(|e| e.to_string())?;
-    if let Some(parent) = full.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-    // full может ещё не существовать — канонизируем ближайшего существующего родителя
+    // Канонизируем глубочайший СУЩЕСТВУЮЩИЙ компонент пути (вплоть до full сам).
+    // Если где-то по цепочке симлинк наружу — canonicalize вынесет это в префикс.
     let mut probe = full.clone();
-    let mut to_canon = Vec::new();
     while !probe.exists() {
-        to_canon.push(probe.clone());
         if !probe.pop() {
             return Err("не удалось канонизировать путь".into());
         }
@@ -71,10 +65,15 @@ fn resolve_in_app_data(app: &tauri::AppHandle, rel: &str) -> Result<PathBuf, Str
     if !canon.starts_with(&canonical_base) {
         return Err("путь выходит за пределы директории приложения".into());
     }
-    for p in to_canon.iter().rev() {
-        let c = p.canonicalize().map_err(|e| e.to_string())?;
-        if !c.starts_with(&canonical_base) {
-            return Err("путь выходит за пределы директории приложения".into());
+    // Создаём недостающие каталоги ТОЛЬКО после containment-проверки (vuln: symlink-planting)
+    if let Some(parent) = full.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| format!("mkdir: {e}"))?;
+            // После создания перепроверяем: родитель мог оказаться симлинком наружу
+            let canon_parent = parent.canonicalize().map_err(|e| e.to_string())?;
+            if !canon_parent.starts_with(&canonical_base) {
+                return Err("путь выходит за пределы директории приложения".into());
+            }
         }
     }
     Ok(full)

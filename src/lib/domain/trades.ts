@@ -172,8 +172,35 @@ export function createTrade(patch: Partial<Trade> = {}): Trade {
 /** Привести загруженную сделку к полному виду (терпимо к старым записям). */
 export function normalizeTrade(raw: unknown): Trade {
 	const t = (raw && typeof raw === 'object' ? raw : {}) as Partial<Trade> & Record<string, unknown>;
+	const knownKeys = new Set([
+		'id',
+		'dateOpen',
+		'dateOpenManual',
+		'pair',
+		'direction',
+		'volume',
+		'priceOpen',
+		'sl',
+		'tp',
+		'status',
+		'dateClose',
+		'priceClose',
+		'commission',
+		'swap',
+		'profit',
+		'contractSize',
+		'tags',
+		'comment',
+		'attachments'
+	]);
+	const extras: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(t)) {
+		if (!knownKeys.has(key) && key !== '__proto__') extras[key] = value;
+	}
+	const resolvedId = t.id ?? uuid();
 	return {
-		id: String(t.id || uuid()),
+		...extras,
+		id: String(resolvedId),
 		dateOpen: t.dateOpen || nowStamp(),
 		dateOpenManual: Boolean(t.dateOpenManual),
 		pair: normalizeSymbol(t.pair || 'EURUSD') || 'EURUSD',

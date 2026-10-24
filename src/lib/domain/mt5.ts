@@ -445,6 +445,8 @@ export function parseMt5Report(htmlContent: string): Mt5ParseResult {
 	const raw = String(htmlContent || '');
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(raw, 'text/html');
+	// содержимое <script>/<style> не должно попадать в textContent ячеек
+	doc.querySelectorAll('script, style').forEach((node) => node.remove());
 	const titleNorm = normalizeSectionHeader(doc.querySelector('title')?.textContent || '');
 
 	const meta = extractMt5StatementMeta(doc);

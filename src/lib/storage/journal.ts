@@ -24,27 +24,30 @@ interface JournalPayload {
 	trades: Trade[];
 }
 
-async function readRaw(): Promise<JournalPayload | null> {
+async function readRaw(): Promise<{ data: JournalPayload | null; failed: boolean }> {
 	if (isTauri()) {
 		try {
 			const files = await invoke<string[]>('list_data_files', { relDir: '' });
 			if (Array.isArray(files) && files.includes(FILE)) {
 				const text = await invoke<string | null>('read_data_file', { relPath: FILE });
-				if (text == null) return null;
-				return JSON.parse(String(text));
+				if (text == null) return { data: null, failed: false };
+				return { data: JSON.parse(String(text)), failed: false };
 			}
+			// файла ещё нет — чистый первый запуск
+			return { data: null, failed: false };
 		} catch (e) {
+			// реальная ошибка хранилища: не сеем демо поверх данных пользователя
 			console.error('journal.read (tauri) failed', e);
+			return { data: null, failed: true };
 		}
-		return null;
 	}
 	const raw = ns.get(KEY);
-	if (!raw) return null;
+	if (!raw) return { data: null, failed: false };
 	try {
-		return JSON.parse(raw);
+		return { data: JSON.parse(raw), failed: false };
 	} catch (e) {
 		console.error('journal.read (local) failed', e);
-		return null;
+		return { data: null, failed: true };
 	}
 }
 
@@ -63,11 +66,11 @@ async function writeRaw(data: JournalPayload): Promise<void> {
 
 /** Загрузить журнал. При первом запуске — демо-набор, чтобы интерфейс был живым. */
 export async function loadTrades({ seedDemo = true }: { seedDemo?: boolean } = {}): Promise<Trade[]> {
-	const data = await readRaw();
+	const { data, failed } = await readRaw();
 	if (data && Array.isArray(data.trades)) {
 		return data.trades.map(normalizeTrade);
 	}
-	if (!seedDemo) return [];
+	if (failed || !seedDemo) return [];
 	const seed = demoMt5Report(28);
 	await writeRaw({ version: SCHEMA_VERSION, trades: seed });
 	return seed.map(normalizeTrade);
