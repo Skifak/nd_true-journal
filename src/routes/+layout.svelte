@@ -1,14 +1,17 @@
 <script>
 	import '../app.css';
 	import favicon from '#lib/assets/favicon.svg';
+	import { page } from '$app/state';
 
 	let { children } = $props();
 
 	const nav = [
-		{ idx: '01', label: 'Дашборд', href: '#/', active: true },
-		{ idx: '02', label: 'Сделки', href: '#/trades', active: false },
-		{ idx: '03', label: 'Заметки', href: '#/notes', active: false }
+		{ idx: '01', label: 'Дашборд', path: '/' },
+		{ idx: '02', label: 'Все сделки', path: '/trades' },
+		{ idx: '03', label: 'Заметки', path: '/notes' }
 	];
+
+	const current = $derived(nav.find((n) => n.path === page.url.pathname) ?? nav[0]);
 </script>
 
 <svelte:head>
@@ -22,8 +25,8 @@
 			<span class="brand-sub">nd · офлайн</span>
 		</div>
 		<nav>
-			{#each nav as item}
-				<a class="nav-item" class:active={item.active} href={item.href}>
+			{#each nav as item (item.path)}
+				<a class="nav-item" class:active={item.path === current.path} href={item.path}>
 					<span class="nav-idx">{item.idx}</span>
 					<span class="nav-label">{item.label}</span>
 				</a>
@@ -37,8 +40,8 @@
 	<div class="content">
 		<header class="topbar">
 			<span class="breadcrumb">
-				<span class="nav-idx">01 ／</span>
-				Дашборд
+				<span class="nav-idx">{current.idx} ／</span>
+				{current.label}
 			</span>
 			<span class="topbar-right eyebrow">{new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })}</span>
 		</header>
