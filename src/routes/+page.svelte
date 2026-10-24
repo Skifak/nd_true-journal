@@ -1,6 +1,6 @@
-<script>
-	import { detectPlatform, isTauri } from '#lib/platform/index.js';
-	import { namespaced } from '#lib/storage/local.js';
+<script lang="ts">
+	import { detectPlatform, isTauri } from '#lib/platform/index.ts';
+	import { namespaced } from '#lib/storage/local.ts';
 	import EquityChart from '#lib/components/EquityChart.svelte';
 	import PanelToggle from '#lib/components/PanelToggle.svelte';
 

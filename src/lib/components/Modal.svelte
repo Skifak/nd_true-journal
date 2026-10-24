@@ -1,38 +1,21 @@
-<script>
+<script lang="ts">
 	import { fade } from 'svelte/transition';
+	import type { Snippet } from 'svelte';
 
-	/**
-	 * Modal — переиспользуемая плоская модалка в стиле журнала.
-	 *
-	 *   <Modal bind:open={open} title="Заголовок" size="md">
-	 *     ...тело...
-	 *     {#snippet footer()}
-	 *       <button>OK</button>
-	 *     {/snippet}
-	 *   </Modal>
-	 *
-	 * Возможности:
-	 *  - непрозрачная подложка (--scrim), без стекла и blur
-	 *  - угловые марки в языке frame-hover
-	 *  - закрытие: клик по подложке, Escape, кнопка ✕
-	 *  - ловушка фокуса и возврат фокуса на инициатора
-	 *  - блокировка прокрутки страницы, пока модалка открыта
-	 *  - размеры sm | md | lg | xl
-	 *
-	 * @type {{
-	 *   open?: boolean,
-	 *   title?: string,
-	 *   subtitle?: string,
-	 *   size?: 'sm'|'md'|'lg'|'xl',
-	 *   closable?: boolean,
-	 *   closeOnBackdrop?: boolean,
-	 *   closeOnEscape?: boolean,
-	 *   onClose?: () => void,
-	 *   header?: import('svelte').Snippet,
-	 *   children?: import('svelte').Snippet,
-	 *   footer?: import('svelte').Snippet
-	 * }}
-	 */
+	interface Props {
+		open?: boolean;
+		title?: string;
+		subtitle?: string;
+		size?: 'sm' | 'md' | 'lg' | 'xl';
+		closable?: boolean;
+		closeOnBackdrop?: boolean;
+		closeOnEscape?: boolean;
+		onClose?: () => void;
+		header?: Snippet;
+		children?: Snippet;
+		footer?: Snippet;
+	}
+
 	let {
 		open = $bindable(false),
 		title = '',
@@ -45,14 +28,13 @@
 		header,
 		children,
 		footer
-	} = $props();
+	}: Props = $props();
 
-	const WIDTHS = { sm: '400px', md: '680px', lg: '860px', xl: '1040px' };
+	const WIDTHS: Record<string, string> = { sm: '400px', md: '680px', lg: '860px', xl: '1040px' };
 
-	let dialogEl = $state(/** @type {HTMLElement|null} */ (null));
-	let backdropEl = $state(/** @type {HTMLElement|null} */ (null));
-	/** @type {HTMLElement|null} */
-	let opener = null;
+	let dialogEl = $state<HTMLDivElement | null>(null);
+	let backdropEl = $state<HTMLDivElement | null>(null);
+	let opener: HTMLElement | null = null;
 
 	const titleId = $props.id();
 
@@ -65,9 +47,9 @@
 	$effect(() => {
 		if (!open) return;
 
-		opener = /** @type {HTMLElement|null} */ (document.activeElement);
+		opener = document.activeElement as HTMLElement | null;
 
-		const onKey = (e) => {
+		const onKey = (e: KeyboardEvent) => {
 			if (e.key === 'Escape' && closeOnEscape) {
 				e.preventDefault();
 				close();
@@ -78,8 +60,8 @@
 				'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 			);
 			if (!focusables.length) return;
-			const first = /** @type {HTMLElement} */ (focusables[0]);
-			const last = /** @type {HTMLElement} */ (focusables[focusables.length - 1]);
+			const first = focusables[0] as HTMLElement;
+			const last = focusables[focusables.length - 1] as HTMLElement;
 			if (e.shiftKey && document.activeElement === first) {
 				e.preventDefault();
 				last.focus();
@@ -98,7 +80,7 @@
 			const target = dialogEl?.querySelector(
 				'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
 			);
-			/** @type {HTMLElement} */ (target ?? dialogEl)?.focus?.();
+			(target as HTMLElement | null)?.focus?.();
 		});
 
 		return () => {
@@ -108,7 +90,7 @@
 		};
 	});
 
-	function onBackdropClick(e) {
+	function onBackdropClick(e: MouseEvent) {
 		if (!closeOnBackdrop) return;
 		if (e.target === backdropEl) close();
 	}

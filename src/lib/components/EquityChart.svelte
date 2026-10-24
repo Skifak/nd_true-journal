@@ -1,22 +1,16 @@
-<script>
-	/**
-	 * EquityChart — пресет LineChart под «Кривую капитала» журнала.
-	 * Оси: слева % от стартового значения (0..100 по умолчанию), снизу даты.
-	 *
-	 *   <EquityChart values={equityByDay} dates={dayLabels} heightRatio={0.26} />
-	 *
-	 * Для других графиков (PnL по дням, R-мультипли, баланс) — используй LineChart напрямую.
-	 * @type {{
-	 *   values?: number[],
-	 *   dates?: string[],
-	 *   title?: string,
-	 *   heightRatio?: number,
-	 *   forecast?: { from?: number, label?: string } | null,
-	 *   yMin?: number|null,
-	 *   yMax?: number|null
-	 * }}
-	 */
+<script lang="ts">
 	import LineChart from './LineChart.svelte';
+
+	interface Props {
+		values?: number[];
+		dates?: string[];
+		title?: string;
+		heightRatio?: number;
+		forecast?: { from: number; label: string } | null;
+		/** Домен оси Y в «сырых» единицах; по умолчанию шкала 0..100% от старта */
+		yMin?: number | null;
+		yMax?: number | null;
+	}
 
 	let {
 		values = [22, 26, 24, 31, 29, 36, 34, 42],
@@ -24,10 +18,9 @@
 		title = 'Кривая капитала',
 		heightRatio = 0.17,
 		forecast = { from: 0.75, label: 'FORECAST' },
-		/** Домен оси Y в «сырых» единицах; по умолчанию шкала 0..100% от старта */
 		yMin = null,
 		yMax = null
-	} = $props();
+	}: Props = $props();
 
 	// Дата из YYYY-MM-DD → dd.mm (компактно для оси X)
 	const shortDates = $derived(

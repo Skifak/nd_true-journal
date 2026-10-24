@@ -1,28 +1,38 @@
-<script>
+<script lang="ts">
 	/**
 	 * Импорт отчёта MetaTrader 5: выбор файла → разбор → предпросмотр → добавление.
 	 * Разбор полностью локальный, файл никуда не отправляется.
 	 */
 	import Modal from './Modal.svelte';
-	import { decodeMt5Html, parseMt5Report } from '#lib/domain/mt5.js';
-	import { formatDate, formatMoney, tradeProfit } from '#lib/domain/trades.js';
+	import { decodeMt5Html, parseMt5Report, type Mt5ParseResult } from '#lib/domain/mt5.ts';
+	import {
+		formatDate,
+		formatMoney,
+		tradeProfit,
+		type Trade
+	} from '#lib/domain/trades.ts';
 
-	/** @type {{open?: boolean, currency?: string, onImport?: (trades:any[])=>number, onClose?: (added?: number)=>void}} */
+	interface Props {
+		open?: boolean;
+		currency?: string;
+		onImport?: (trades: Trade[]) => number;
+		onClose?: (added?: number) => void;
+	}
+
 	let {
 		open = $bindable(false),
 		currency = 'USD',
 		onImport = () => 0,
 		onClose = () => {}
-	} = $props();
+	}: Props = $props();
 
-	let result = $state(/** @type {any} */ (null));
+	let result = $state<Mt5ParseResult | null>(null);
 	let fileName = $state('');
 	let busy = $state(false);
 	let errMsg = $state('');
 	let dragOver = $state(false);
 
-	/** @param {File} file */
-	async function handleFile(file) {
+	async function handleFile(file: File) {
 		if (!file) return;
 		busy = true;
 		errMsg = '';
@@ -41,17 +51,15 @@
 		}
 	}
 
-	/** @param {DragEvent} e */
-	function onDrop(e) {
+	function onDrop(e: DragEvent) {
 		e.preventDefault();
 		dragOver = false;
 		const f = e.dataTransfer?.files?.[0];
 		if (f) handleFile(f);
 	}
 
-	/** @param {Event & {currentTarget: EventTarget & HTMLInputElement}} e */
-	function onPick(e) {
-		const f = e.currentTarget.files?.[0];
+	function onPick(e: Event) {
+		const f = (e.currentTarget as HTMLInputElement).files?.[0];
 		if (f) handleFile(f);
 	}
 
@@ -138,7 +146,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each /** @type {any[]} */ (result.trades).slice(0, 12) as t (t.id)}
+						{#each  (result.trades).slice(0, 12) as t (t.id)}
 							{@const pl = tradeProfit(t)}
 							<tr>
 								<td class="mono">{formatDate(t.dateOpen)}</td>

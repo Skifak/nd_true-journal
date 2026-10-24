@@ -1,59 +1,42 @@
-<script>
-	/**
-	 * LineChart — универсальный SVG-график линии в стиле nf-diagram/nf-chart
-	 * (ink-orbit-saas-template). Без зависимостей, адаптивный, интерактивный.
-	 *
-	 * Базовое использование:
-	 *   <LineChart values={[10, 14, 12, 18]} />
-	 *
-	 * Всё настраивается пропсами:
-	 *   values      — числа (обязательно)
-	 *   labels      — подписи точек по X (даты/категории); нет — сгенерируются даты
-	 *   heightRatio — высота как доля ширины контейнера
-	 *   yFormat     — (value, base) => string, подпись оси Y
-	 *   tipFormat   — (value, index, base) => string, подпись тултипа
-	 *   forecast    — { from?: number, label?: string } | null — пунктир прогноза
-	 *   showPoints  — рисовать маркеры точек и кроссхейр
-	 *   stroke / fill — CSS-цвета линии и заливки (по умолчанию — палитра журнала)
-	 *
-	 * @type {{
-	 *   values?: number[],
-	 *   labels?: string[],
-	 *   heightRatio?: number,
-	 *   ariaLabel?: string,
-	 *   yFormat?: (v: number, base: number) => string,
-	 *   tipFormat?: (v: number, i: number, base: number) => string,
-	 *   forecast?: { from?: number, label?: string } | null,
-	 *   showPoints?: boolean,
-	 *   stroke?: string,
-	 *   fill?: string,
-	 *   strokeWidth?: number,
-	 *   yMin?: number | null,
-	 *   yMax?: number | null
-	 * }}
-	 */
+<script lang="ts">
+	interface Props {
+		values?: number[];
+		labels?: string[];
+		heightRatio?: number;
+		ariaLabel?: string;
+		yFormat?: (v: number, base: number) => string;
+		tipFormat?: (v: number, i: number, base: number) => string;
+		forecast?: { from: number; label: string } | null;
+		showPoints?: boolean;
+		/** Фиксированные границы оси Y (для «шкалы 0..100%»); null — из данных */
+		yMin?: number | null;
+		yMax?: number | null;
+		stroke?: string;
+		fill?: string;
+		strokeWidth?: number;
+	}
+
 	let {
 		values = [],
 		labels = [],
 		heightRatio = 0.17,
 		ariaLabel = 'График',
-		yFormat = (v, base) => {
+		yFormat = (v: number, base: number) => {
 			const pct = ((v - base) / (base || 1)) * 100;
 			return (pct > 0 ? '+' : '') + pct.toFixed(0) + '%';
 		},
-		tipFormat = (v, i, base) => {
+		tipFormat = (v: number, i: number, base: number) => {
 			const pct = ((v - base) / (base || 1)) * 100;
 			return (pct > 0 ? '+' : '') + pct.toFixed(0) + '%';
 		},
 		forecast = { from: 0.75, label: 'FORECAST' },
 		showPoints = true,
-		/** Фиксированные границы оси Y (для «шкалы 0..100%»); null — из данных */
 		yMin = null,
 		yMax = null,
 		stroke = 'var(--sage)',
 		fill = 'var(--ink)',
 		strokeWidth = 1.4
-	} = $props();
+	}: Props = $props();
 
 	const padT = 14;
 	const padB = 26;
@@ -62,10 +45,9 @@
 	const DEBOUNCE_MS = 250;
 
 	// --- Замер контейнера (аналог useDimensions: ResizeObserver + debounce) ---
-	let wrapEl = $state(/** @type {HTMLElement|null} */ (null));
+	let wrapEl = $state<HTMLDivElement | null>(null);
 	let measured = $state({ width: 0, height: 0 });
-	/** @type {any} */
-	let debounceId;
+	let debounceId: ReturnType<typeof setTimeout> | undefined;
 
 	$effect(() => {
 		if (!wrapEl) return;
@@ -186,8 +168,7 @@
 		hoverIdx >= 0 ? geometry.pts[hoverIdx] : geometry.pts[geometry.pts.length - 1]
 	);
 
-	/** @param {number} x */
-	function nearestX(x) {
+	function nearestX(x: number): number {
 		let best = 0;
 		for (let i = 1; i < geometry.pts.length; i++) {
 			if (Math.abs(geometry.pts[i][0] - x) < Math.abs(geometry.pts[best][0] - x)) best = i;
@@ -195,10 +176,9 @@
 		return best;
 	}
 
-	/** @param {PointerEvent & {currentTarget: EventTarget & SVGSVGElement}} e */
-	function onMove(e) {
+	function onMove(e: PointerEvent) {
 		if (!showPoints) return;
-		const rect = e.currentTarget.getBoundingClientRect();
+		const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
 		hoverIdx = nearestX(((e.clientX - rect.left) / rect.width) * W);
 	}
 

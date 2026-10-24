@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	/**
 	 * Страница «Все сделки»: фильтры + таблица + действия.
 	 * Данные — из journalStore, состояние UI (фильтры/колонки/сортировка) — локально.
@@ -13,9 +13,11 @@
 		filterTrades,
 		sortTrades,
 		symbolsFromTrades,
-		computeTotals
-	} from '#lib/domain/journal.js';
-	import { formatMoney } from '#lib/domain/trades.js';
+		computeTotals,
+		type Filters,
+		type SortState
+	} from '#lib/domain/journal.ts';
+	import { formatMoney, type Trade } from '#lib/domain/trades.ts';
 	import {
 		addTrade,
 		deleteAllTrades,
@@ -26,8 +28,8 @@
 		initJournal,
 		journalState,
 		updateTrade
-	} from '#lib/storage/journalStore.svelte.js';
-	import { loadUiSetting, saveUiSetting } from '#lib/storage/journal.js';
+	} from '#lib/storage/journalStore.svelte.ts';
+	import { loadUiSetting, saveUiSetting } from '#lib/storage/journal.ts';
 
 	const COLUMNS = [
 		{ id: 'duration', label: 'Длительность' },
@@ -41,12 +43,12 @@
 	];
 	const DEFAULT_COLS = Object.fromEntries(COLUMNS.map((c) => [c.id, true]));
 
-	let filters = $state(loadUiSetting('filters', emptyFilters()));
-	let sort = $state(loadUiSetting('sort', { key: 'dateClose', dir: 'desc' }));
-	let visibleCols = $state(loadUiSetting('cols', DEFAULT_COLS));
+	let filters = $state<Filters>(loadUiSetting('filters', emptyFilters()));
+	let sort = $state<SortState>(loadUiSetting<SortState>('sort', { key: 'dateClose', dir: 'desc' }));
+	let visibleCols = $state<Record<string, boolean>>(loadUiSetting('cols', DEFAULT_COLS));
 
 	let dialogOpen = $state(false);
-	let editing = $state(null);
+	let editing = $state<Trade | null>(null);
 	let importOpen = $state(false);
 	let confirmWipe = $state(false);
 	let toast = $state('');
@@ -72,7 +74,7 @@
 		saveUiSetting('cols', $state.snapshot(visibleCols));
 	});
 
-	function showToast(msg) {
+	function showToast(msg: string) {
 		toast = msg;
 		setTimeout(() => (toast = ''), 2600);
 	}
@@ -82,12 +84,12 @@
 		dialogOpen = true;
 	}
 
-	function openEdit(trade) {
+	function openEdit(trade: Trade) {
 		editing = trade;
 		dialogOpen = true;
 	}
 
-	function handleSave(payload) {
+	function handleSave(payload: Partial<Trade>) {
 		if (payload.id) {
 			updateTrade(payload.id, payload);
 			showToast('Сделка обновлена');
@@ -97,24 +99,22 @@
 		}
 	}
 
-	function handleDelete(trade) {
+	function handleDelete(trade: Trade) {
 		deleteTrade(trade.id);
 		dialogOpen = false;
 		showToast('Сделка удалена');
 	}
 
-	function handleDuplicate(trade) {
+	function handleDuplicate(trade: Trade) {
 		duplicateTrade(trade.id);
 		showToast('Сделка дублирована');
 	}
 
-	/** @param {any[]} trades */
-	function handleImport(trades) {
+	function handleImport(trades: Trade[]) {
 		return importTrades(trades);
 	}
 
-	/** @param {number} [added] */
-	function onImportClose(added) {
+	function onImportClose(added?: number) {
 		if (typeof added === 'number') {
 			showToast(added ? `Импортировано: ${added}` : 'Новых сделок нет (дубликаты)');
 		}
@@ -176,7 +176,10 @@
 	bind:open={dialogOpen}
 	trade={editing}
 	onSave={handleSave}
-	onDelete={handleDelete}
+	onDelete={(id) => {
+		const t = all.find((x) => x.id === id);
+		if (t) handleDelete(t);
+	}}
 	onClose={() => (editing = null)}
 />
 

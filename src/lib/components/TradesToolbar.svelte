@@ -1,21 +1,27 @@
-<script>
+<script lang="ts">
 	/**
 	 * Панель фильтров журнала: поиск, символ, направление, SL/TP, источник, победы/убытки.
 	 * Переключатель видимости колонок — здесь же.
 	 */
-	import { emptyFilters } from '#lib/domain/journal.js';
+	import { emptyFilters, type Filters } from '#lib/domain/journal.ts';
 
-	/** @type {{
-	 *   filters?: any,
-	 *   symbols?: string[],
-	 *   visibleCols?: Record<string, boolean>,
-	 *   columns?: {id:string,label:string}[],
-	 *   total?: number,
-	 *   shown?: number,
-	 *   onImport?: ()=>void,
-	 *   onAdd?: ()=>void,
-	 *   onDeleteAll?: ()=>void
-	 * }} */
+	interface Column {
+		id: string;
+		label: string;
+	}
+
+	interface Props {
+		filters?: Filters;
+		symbols?: string[];
+		visibleCols?: Record<string, boolean>;
+		columns?: Column[];
+		total?: number;
+		shown?: number;
+		onImport?: () => void;
+		onAdd?: () => void;
+		onDeleteAll?: () => void;
+	}
+
 	let {
 		filters = $bindable(emptyFilters()),
 		symbols = [],
@@ -26,7 +32,7 @@
 		onImport = () => {},
 		onAdd = () => {},
 		onDeleteAll = () => {}
-	} = $props();
+	}: Props = $props();
 
 	let colsOpen = $state(false);
 

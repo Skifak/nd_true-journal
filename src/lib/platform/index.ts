@@ -3,35 +3,34 @@
 // В браузере это безопасные эмуляции поверх localStorage/IndexedDB,
 // в Tauri — вызовы нативных команд с валидацией путей на стороне Rust.
 
-/**
- * @typedef {'browser' | 'tauri'} PlatformKind
- */
+export type PlatformKind = 'browser' | 'tauri';
 
-const platforms = {
+/** Минимальная форма Tauri API, которую использует приложение. */
+export interface TauriGlobal {
+	core: {
+		invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T>;
+	};
+}
+
+const platforms: { browser: null; tauri: TauriGlobal | null } = {
 	browser: null,
 	tauri: null
 };
 
-/** @returns {PlatformKind} */
-export function detectPlatform() {
+export function detectPlatform(): PlatformKind {
 	// Tauri 2 injects __TAURI_INTERNALS__ до загрузки бандла
 	if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) return 'tauri';
 	return 'browser';
 }
 
-/** @returns {boolean} */
-export function isTauri() {
+export function isTauri(): boolean {
 	return detectPlatform() === 'tauri';
 }
 
-/**
- * Строгий доступ к глобальному Tauri API (withGlobalTauri: true).
- * @returns {Record<string, any>}
- */
-export function tauri() {
+/** Строгий доступ к глобальному Tauri API (withGlobalTauri: true). */
+export function tauri(): TauriGlobal {
 	if (platforms.tauri) return platforms.tauri;
-	// @ts-ignore
-	const t = globalThis.__TAURI__;
+	const t = (globalThis as { __TAURI__?: TauriGlobal }).__TAURI__;
 	if (!t) throw new Error('Tauri API недоступен (приложение запущено вне Tauri?)');
 	platforms.tauri = t;
 	return t;
@@ -40,11 +39,10 @@ export function tauri() {
 /**
  * Безопасный вызов нативной команды: существует только в Tauri,
  * в браузере выбрасывает понятную ошибку (не молча эмулирует).
- * @template T
- * @param {string} cmd
- * @param {Record<string, unknown>=} args
- * @returns {Promise<T>}
  */
-export async function invoke(cmd, args = {}) {
-	return /** @type {Promise<T>} */ (tauri().core.invoke(cmd, args));
+export async function invoke<T = unknown>(
+	cmd: string,
+	args: Record<string, unknown> = {}
+): Promise<T> {
+	return tauri().core.invoke<T>(cmd, args);
 }

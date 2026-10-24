@@ -1,23 +1,20 @@
 // Типобезопасная обёртка над localStorage с поддержкой префиксов (мультиаккаунт).
 // Работает одинаково в браузере и в Tauri (WebView хранит данные в профиле приложения).
 
-/**
- * @typedef {Object} SafeStorage
- * @property {(key: string) => string | null} get
- * @property {(key: string, value: string) => void} set
- * @property {(key: string) => void} remove
- * @property {(prefix: string) => string[]} keys
- */
+export interface SafeStorage {
+	get(key: string): string | null;
+	set(key: string, value: string): void;
+	remove(key: string): void;
+	keys(prefix: string): string[];
+}
 
-/** @type {SafeStorage} */
-let impl;
+let impl: SafeStorage | null = null;
 
-function getImpl() {
+function getImpl(): SafeStorage {
 	if (impl) return impl;
 	if (typeof localStorage === 'undefined') {
 		// SSR-безопасная заглушка
-		/** @type {Map<string, string>} */
-		const mem = new Map();
+		const mem = new Map<string, string>();
 		impl = {
 			get: (k) => mem.get(k) ?? null,
 			set: (k, v) => void mem.set(k, v),
@@ -50,8 +47,7 @@ function getImpl() {
 			}
 		},
 		keys(prefix) {
-			/** @type {string[]} */
-			const out = [];
+			const out: string[] = [];
 			for (let i = 0; i < localStorage.length; i++) {
 				const k = localStorage.key(i);
 				if (k && k.startsWith(prefix)) out.push(k);
@@ -65,10 +61,8 @@ function getImpl() {
 /**
  * Пространство имён: возвращает объект с методами get/set/remove,
  * где каждый ключ автоматически дополняется префиксом.
- * @param {string} prefix
- * @returns {SafeStorage}
  */
-export function namespaced(prefix) {
+export function namespaced(prefix: string): SafeStorage {
 	const b = getImpl();
 	return {
 		get: (k) => b.get(prefix + k),
@@ -78,7 +72,7 @@ export function namespaced(prefix) {
 	};
 }
 
-export const storage = {
+export const storage: SafeStorage = {
 	get: (k) => getImpl().get(k),
 	set: (k, v) => getImpl().set(k, v),
 	remove: (k) => getImpl().remove(k),

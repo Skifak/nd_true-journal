@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	/**
 	 * Модальная форма сделки: создание и редактирование.
 	 * Без зависимостей. Валидация — доменными функциями.
@@ -16,17 +16,40 @@
 		getContractSize,
 		nowStamp,
 		PAIRS,
-		tradeProfit
-	} from '#lib/domain/trades.js';
+		tradeProfit,
+		type Direction,
+		type Trade,
+		type TradeStatus
+	} from '#lib/domain/trades.ts';
 
-	/** @type {{
-	 *   open?: boolean,
-	 *   trade?: any,
-	 *   currency?: string,
-	 *   onSave?: (trade:any)=>void,
-	 *   onDelete?: (trade:any)=>void,
-	 *   onClose?: ()=>void
-	 * }} */
+	/** Форма как строка: числовые поля вводятся текстом и парсятся при сохранении. */
+	interface TradeForm {
+		id: string;
+		dateOpen: string;
+		pair: string;
+		direction: Direction;
+		volume: number | string;
+		priceOpen: number | string;
+		sl: number | string;
+		tp: number | string;
+		status: TradeStatus;
+		dateClose: string;
+		priceClose: number | string;
+		commission: number | string;
+		swap: number | string;
+		contractSize: number | string;
+		comment: string;
+	}
+
+	interface Props {
+		open?: boolean;
+		trade?: Trade | null;
+		currency?: string;
+		onSave?: (patch: Partial<Trade>) => void;
+		onDelete?: (id: string) => void;
+		onClose?: () => void;
+	}
+
 	let {
 		open = $bindable(false),
 		trade = null,
@@ -34,24 +57,22 @@
 		onSave = () => {},
 		onDelete = () => {},
 		onClose = () => {}
-	} = $props();
+	}: Props = $props();
 
-	let form = $state(/** @type {any} */ (null));
+	let form = $state<TradeForm | null>(null);
 	let errorMsg = $state('');
 
 	// «Текущее время» из старого журнала: чекбокс вместо ручного ввода
 	let useCurrentTime = $state(true);
 	/** datetime-local работает с 'YYYY-MM-DDTHH:mm', журнал хранит ' ' — конвертация туда-обратно */
-	/** @param {string|null} stamp */
-	const toLocalInput = (stamp) => (stamp ? String(stamp).replace(' ', 'T').slice(0, 16) : '');
-	/** @param {string|null} v */
-	const fromLocalInput = (v) => (v ? String(v).replace('T', ' ') : '');
+		const toLocalInput = (stamp: string) => (stamp ? String(stamp).replace(' ', 'T').slice(0, 16) : '');
+		const fromLocalInput = (v: string) => (v ? String(v).replace('T', ' ') : '');
 
 	// Пересоздаём форму при открытии/смене сделки
 	$effect(() => {
 		if (!open) return;
 		form = trade
-			? { ...trade, sl: trade.sl ?? '', tp: trade.tp ?? '', priceClose: trade.priceClose ?? '' }
+			? ({ ...trade, sl: trade.sl ?? '', tp: trade.tp ?? '', priceClose: trade.priceClose ?? '' } as unknown as TradeForm)
 			: {
 					id: '',
 					dateOpen: nowStamp(),
@@ -75,17 +96,21 @@
 
 	const isNew = $derived(!form?.id);
 	const preview = $derived.by(() => {
-		if (!form || !form.priceOpen || form.priceClose === '' || form.priceClose == null) return null;
+		const f = form;
+		if (!f || !f.priceOpen || f.priceClose === '' || f.priceClose == null) return null;
 		return calculateProfit({
-			...form,
-			priceOpen: Number(form.priceOpen),
-			priceClose: Number(form.priceClose),
-			volume: Number(form.volume) || 0,
-			contractSize: form.contractSize === '' ? null : Number(form.contractSize)
+			pair: f.pair,
+			direction: f.direction,
+			priceOpen: Number(f.priceOpen),
+			priceClose: Number(f.priceClose),
+			volume: Number(f.volume) || 0,
+			contractSize: f.contractSize === '' ? null : Number(f.contractSize),
+			commission: Number(f.commission) || 0,
+			swap: Number(f.swap) || 0
 		});
 	});
 
-	const contract = $derived(form ? getContractSize(form.pair, form.contractSize === '' ? null : form.contractSize) : 0);
+	const contract = $derived(form ? getContractSize(form!.pair, form!.contractSize === '' ? null : form!.contractSize) : 0);
 
 	// ── Риск и R:R (механика TradeFormRiskPanel старого журнала) ──
 	const RR_PRESETS = [
@@ -97,26 +122,26 @@
 
 	const riskInfo = $derived.by(() => {
 		if (!form) return { amount: null, rr: null };
-		const entry = Number(form.priceOpen);
-		const sl = Number(form.sl);
-		const tp = Number(form.tp);
-		const units = getContractSize(form.pair, form.contractSize === '' ? null : form.contractSize) * (Number(form.volume) || 0);
-		/** @type {number|null} */ const amount = sl > 0 && entry > 0 ? Math.abs(entry - sl) * units : null;
-		/** @type {number|null} */ const reward = tp > 0 && entry > 0 ? Math.abs(tp - entry) * units : null;
+		const entry = Number(form!.priceOpen);
+		const sl = Number(form!.sl);
+		const tp = Number(form!.tp);
+		const units = getContractSize(form!.pair, form!.contractSize === '' ? null : form!.contractSize) * (Number(form!.volume) || 0);
+		 const amount = sl > 0 && entry > 0 ? Math.abs(entry - sl) * units : null;
+		 const reward = tp > 0 && entry > 0 ? Math.abs(tp - entry) * units : null;
 		const rr = amount != null && reward != null && amount > 0 ? reward / amount : null;
 		return { amount, rr };
 	});
-	const canApplyRr = $derived(Number(form?.priceOpen) > 0 && Number(form?.sl) > 0 && Number(form.priceOpen) !== Number(form.sl));
+	const canApplyRr = $derived(Number(form?.priceOpen) > 0 && Number(form?.sl) > 0 && Number(form?.priceOpen) !== Number(form?.sl));
 
-	/** @param {number} ratio */
-	function applyRr(ratio) {
+	function applyRr(ratio: number) {
+		if (!form) return;
 		const entry = Number(form.priceOpen);
-		const sl = Number(form.sl);
+		const sl = Number(form!.sl);
 		if (!entry || !sl || entry === sl) return;
 		const dist = Math.abs(entry - sl);
-		const isLong = form.direction === 'long';
+		const isLong = form!.direction === 'long';
 		const tp = isLong ? entry + dist * ratio : entry - dist * ratio;
-		const decimals = String(form.priceOpen).split('.')[1]?.length || 5;
+		const decimals = String(form!.priceOpen).split('.')[1]?.length || 5;
 		form = { ...form, tp: Number(tp.toFixed(decimals)) };
 	}
 
@@ -126,16 +151,16 @@
 		if (errorMsg) return true;
 		if (trade) {
 			return ['pair', 'direction', 'volume', 'priceOpen', 'sl', 'tp', 'comment'].some(
-				(k) => String(form[k] ?? '') !== String(trade[k] ?? '')
+				(k) => String((form as any)[k] ?? '') !== String((trade as any)[k] ?? '')
 			);
 		}
 		// Новая сделка: осмысленно хоть что-то заполнено сверх дефолта
 		return (
-			String(form.pair).toUpperCase() !== 'EURUSD' ||
-			String(form.priceOpen ?? '') !== '' ||
-			String(form.sl ?? '') !== '' ||
-			String(form.tp ?? '') !== '' ||
-			String(form.comment ?? '').trim() !== ''
+			String(form!.pair).toUpperCase() !== 'EURUSD' ||
+			String(form!.priceOpen ?? '') !== '' ||
+			String(form!.sl ?? '') !== '' ||
+			String(form!.tp ?? '') !== '' ||
+			String(form!.comment ?? '').trim() !== ''
 		);
 	});
 
@@ -154,11 +179,12 @@
 	}
 
 	function submit() {
+		if (!form) return;
 		if (!form.pair) {
 			errorMsg = 'Укажите инструмент';
 			return;
 		}
-		if (!(Number(form.volume) > 0)) {
+		if (!(Number(form!.volume) > 0)) {
 			errorMsg = 'Объём должен быть больше нуля';
 			return;
 		}
@@ -166,37 +192,37 @@
 			errorMsg = 'Укажите цену открытия';
 			return;
 		}
-		if (form.status === 'closed' && (form.priceClose === '' || form.priceClose == null)) {
+		if (form!.status === 'closed' && (form!.priceClose === '' || form!.priceClose == null)) {
 			errorMsg = 'Для закрытой сделки нужна цена закрытия';
 			return;
 		}
 		// Валидация дат: журнал и сортировка ломаются от опечаток в формате
 		const stampRe = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/;
-		const dateOpenFinal = useCurrentTime && isNew ? nowStamp() : fromLocalInput(form.dateOpen);
+		const dateOpenFinal = useCurrentTime && isNew ? nowStamp() : fromLocalInput(form!.dateOpen);
 		if (dateOpenFinal && !stampRe.test(dateOpenFinal)) {
 			errorMsg = 'Дата открытия: формат ГГГГ-ММ-ДД ЧЧ:ММ';
 			return;
 		}
-		let dateCloseFinal = form.status === 'closed' ? fromLocalInput(form.dateClose) : null;
+		let dateCloseFinal = form!.status === 'closed' ? fromLocalInput(form!.dateClose) : null;
 		if (dateCloseFinal && !stampRe.test(dateCloseFinal)) {
 			errorMsg = 'Дата закрытия: формат ГГГГ-ММ-ДД ЧЧ:ММ';
 			return;
 		}
 		errorMsg = '';
-		const payload = {
+		const payload: Partial<Trade> = {
 			...form,
 			dateOpen: dateOpenFinal,
 			dateOpenManual: !(useCurrentTime && isNew),
-			pair: String(form.pair).toUpperCase(),
-			volume: Number(form.volume),
-			priceOpen: Number(form.priceOpen),
-			sl: form.sl === '' ? null : Number(form.sl),
-			tp: form.tp === '' ? null : Number(form.tp),
-			priceClose: form.status === 'closed' ? Number(form.priceClose) : null,
-			dateClose: form.status === 'closed' ? dateCloseFinal || nowStamp() : null,
-			commission: Number(form.commission) || 0,
-			swap: Number(form.swap) || 0,
-			contractSize: form.contractSize === '' ? null : Number(form.contractSize)
+			pair: String(form!.pair).toUpperCase(),
+			volume: Number(form!.volume),
+			priceOpen: Number(form!.priceOpen),
+			sl: form!.sl === '' ? null : Number(form!.sl),
+			tp: form!.tp === '' ? null : Number(form!.tp),
+			priceClose: form!.status === 'closed' ? Number(form!.priceClose) : null,
+			dateClose: form!.status === 'closed' ? dateCloseFinal || nowStamp() : null,
+			commission: Number(form!.commission) || 0,
+			swap: Number(form!.swap) || 0,
+			contractSize: form!.contractSize === '' ? null : Number(form!.contractSize)
 		};
 		onSave(payload);
 		open = false;
@@ -213,7 +239,7 @@
 		<div class="grid">
 			<label class="f">
 				<span>Инструмент</span>
-				<input list="pairs" bind:value={form.pair} placeholder="EURUSD" required />
+				<input list="pairs" bind:value={form!.pair} placeholder="EURUSD" required />
 				<datalist id="pairs">
 					{#each PAIRS as p (p)}<option value={p}></option>{/each}
 				</datalist>
@@ -221,7 +247,7 @@
 
 			<label class="f">
 				<span>Направление</span>
-				<select bind:value={form.direction}>
+				<select bind:value={form!.direction}>
 					<option value="long">LONG</option>
 					<option value="short">SHORT</option>
 				</select>
@@ -229,12 +255,12 @@
 
 			<label class="f">
 				<span>Объём (лот)</span>
-				<input type="number" step="0.01" min="0.01" bind:value={form.volume} required />
+				<input type="number" step="0.01" min="0.01" bind:value={form!.volume} required />
 			</label>
 
 			<label class="f">
 				<span>Цена открытия</span>
-				<input type="number" step="any" bind:value={form.priceOpen} required />
+				<input type="number" step="any" bind:value={form!.priceOpen} required />
 			</label>
 
 			<label class="f wide">
@@ -247,8 +273,8 @@
 					{#if !useCurrentTime}
 						<input
 							type="datetime-local"
-							value={toLocalInput(form.dateOpen)}
-							onchange={(e) => (form = { ...form, dateOpen: /** @type {HTMLInputElement} */ (e.target).value })}
+							value={toLocalInput(form!.dateOpen || '')}
+							onchange={(e) => (form = { ...form, dateOpen: (e.currentTarget as HTMLInputElement).value } as TradeForm)}
 						/>
 					{/if}
 				</div>
@@ -256,7 +282,7 @@
 
 			<label class="f">
 				<span>Статус</span>
-				<select bind:value={form.status}>
+				<select bind:value={form!.status}>
 					<option value="open">Открыта</option>
 					<option value="closed">Закрыта</option>
 				</select>
@@ -264,12 +290,12 @@
 
 			<label class="f">
 				<span>SL</span>
-				<input type="number" step="any" bind:value={form.sl} placeholder="—" />
+				<input type="number" step="any" bind:value={form!.sl} placeholder="—" />
 			</label>
 
 			<label class="f">
 				<span>TP</span>
-				<input type="number" step="any" bind:value={form.tp} placeholder="—" />
+				<input type="number" step="any" bind:value={form!.tp} placeholder="—" />
 			</label>
 
 			<div class="f wide">
@@ -294,39 +320,39 @@
 				</div>
 			</div>
 
-			{#if form.status === 'closed'}
+			{#if form!.status === 'closed'}
 				<label class="f">
 					<span>Цена закрытия</span>
-					<input type="number" step="any" bind:value={form.priceClose} required />
+					<input type="number" step="any" bind:value={form!.priceClose} required />
 				</label>
 				<label class="f">
 					<span>Время закрытия</span>
 					<input
 						type="datetime-local"
-						value={toLocalInput(form.dateClose)}
-						onchange={(e) => (form = { ...form, dateClose: /** @type {HTMLInputElement} */ (e.target).value })}
+						value={toLocalInput(form!.dateClose || '')}
+						onchange={(e) => (form = { ...form, dateClose: (e.currentTarget as HTMLInputElement).value } as TradeForm)}
 					/>
 				</label>
 			{/if}
 
 			<label class="f">
 				<span>Комиссия</span>
-				<input type="number" step="any" bind:value={form.commission} />
+				<input type="number" step="any" bind:value={form!.commission} />
 			</label>
 
 			<label class="f">
 				<span>Своп</span>
-				<input type="number" step="any" bind:value={form.swap} />
+				<input type="number" step="any" bind:value={form!.swap} />
 			</label>
 
 			<label class="f">
 				<span>Контракт-сайз</span>
-				<input type="number" step="any" bind:value={form.contractSize} placeholder={`${contract}`} />
+				<input type="number" step="any" bind:value={form!.contractSize} placeholder={`${contract}`} />
 			</label>
 
 			<label class="f wide">
 				<span>Комментарий</span>
-				<textarea rows="2" bind:value={form.comment} placeholder="Сетап, контекст, ошибки…"></textarea>
+				<textarea rows="2" bind:value={form!.comment} placeholder="Сетап, контекст, ошибки…"></textarea>
 			</label>
 		</div>
 
@@ -352,7 +378,7 @@
 					type="button"
 					class="btn danger"
 					onclick={() => {
-						onDelete(form);
+						onDelete(form!.id);
 						open = false;
 					}}>Удалить</button
 				>

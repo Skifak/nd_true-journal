@@ -9,7 +9,6 @@
 // Инструменты и контракт-сайзы
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** @type {Record<string, string[]>} */
 export const PAIR_CATEGORIES = {
 	'FX Majors': ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD'],
 	'FX Crosses': [
@@ -35,7 +34,7 @@ export const PAIR_CATEGORIES = {
 export const PAIRS = Object.values(PAIR_CATEGORIES).flat();
 
 /** Контракт-сайз по умолчанию (единиц базового актива на 1.0 лот). */
-export const DEFAULT_CONTRACT_SIZE = {
+export const DEFAULT_CONTRACT_SIZE: Record<string, number> = {
 	// FX — стандартные 100k
 	EURUSD: 100000, GBPUSD: 100000, USDJPY: 100000, USDCHF: 100000,
 	AUDUSD: 100000, USDCAD: 100000, NZDUSD: 100000,
@@ -63,7 +62,7 @@ export const DEFAULT_CONTRACT_SIZE = {
 };
 
 /** Нормализовать символ: верхний регистр, без суффиксов брокера (.a, _m, -cash). */
-export function normalizeSymbol(symbol) {
+export function normalizeSymbol(symbol: unknown): string {
 	return String(symbol || '')
 		.trim()
 		.toUpperCase()
@@ -72,7 +71,7 @@ export function normalizeSymbol(symbol) {
 }
 
 /** Контракт-сайз: переопределение сделки → справочник → 100000. */
-export function getContractSize(symbol, override = null) {
+export function getContractSize(symbol: unknown, override: number | string | null = null): number {
 	const o = Number(override);
 	if (Number.isFinite(o) && o > 0) return o;
 	const key = normalizeSymbol(symbol);
@@ -80,7 +79,7 @@ export function getContractSize(symbol, override = null) {
 }
 
 /** Размер пипса по символу. */
-export function getPipSize(symbol) {
+export function getPipSize(symbol: unknown): number {
 	const key = normalizeSymbol(symbol);
 	if (!key) return 1;
 	if (key.startsWith('XAU')) return 0.1;
@@ -94,35 +93,38 @@ export function getPipSize(symbol) {
 // Модель сделки
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** @typedef {'long' | 'short'} Direction */
-/** @typedef {'open' | 'closed'} TradeStatus */
+export type Direction = 'long' | 'short';
+export type TradeStatus = 'open' | 'closed';
 
-/**
- * @typedef {Object} Trade
- * @property {string} id
- * @property {string} dateOpen       'YYYY-MM-DD HH:mm:ss'
- * @property {boolean} dateOpenManual
- * @property {string} pair
- * @property {Direction} direction
- * @property {number} volume
- * @property {number} priceOpen
- * @property {number|null} sl
- * @property {number|null} tp
- * @property {TradeStatus} status
- * @property {string|null} dateClose
- * @property {number|null} priceClose
- * @property {number} commission
- * @property {number} swap
- * @property {number|null} profit
- * @property {number|null} contractSize
- * @property {string[]} tags
- * @property {string} comment
- * @property {string[]} attachments
- */
+export interface Trade {
+	/** UUID v4 либо стабильный id импорта MT5: mt5_pos_/mt5_open_. */
+	id: string;
+	/** 'YYYY-MM-DD HH:mm:ss' */
+	dateOpen: string;
+	dateOpenManual: boolean;
+	pair: string;
+	direction: Direction;
+	volume: number;
+	priceOpen: number;
+	sl: number | null;
+	tp: number | null;
+	status: TradeStatus;
+	dateClose: string | null;
+	priceClose: number | null;
+	commission: number;
+	swap: number;
+	profit: number | null;
+	contractSize: number | null;
+	tags: string[];
+	comment: string;
+	attachments: string[];
+	/** Цена рынка у открытых позиций из «Торгового отчёта» MT5. */
+	marketPrice?: number | null;
+}
 
 /** Локальная метка времени 'YYYY-MM-DD HH:mm:ss' (без UTC-сдвига). */
-export function nowStamp(date = new Date()) {
-	const p = (n) => String(n).padStart(2, '0');
+export function nowStamp(date: Date = new Date()): string {
+	const p = (n: number) => String(n).padStart(2, '0');
 	return (
 		`${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ` +
 		`${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`
@@ -130,7 +132,7 @@ export function nowStamp(date = new Date()) {
 }
 
 /** UUID v4 без внешних зависимостей (crypto.getRandomValues, фолбэк на Math.random). */
-export function uuid() {
+export function uuid(): string {
 	const c = globalThis.crypto;
 	if (c?.randomUUID) return c.randomUUID();
 	const bytes = new Uint8Array(16);
@@ -142,8 +144,7 @@ export function uuid() {
 	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** @returns {Trade} */
-export function createTrade(patch = {}) {
+export function createTrade(patch: Partial<Trade> = {}): Trade {
 	return {
 		id: uuid(),
 		dateOpen: nowStamp(),
@@ -169,8 +170,8 @@ export function createTrade(patch = {}) {
 }
 
 /** Привести загруженную сделку к полному виду (терпимо к старым записям). */
-export function normalizeTrade(raw) {
-	const t = raw && typeof raw === 'object' ? raw : {};
+export function normalizeTrade(raw: unknown): Trade {
+	const t = (raw && typeof raw === 'object' ? raw : {}) as Partial<Trade> & Record<string, unknown>;
 	return {
 		id: String(t.id || uuid()),
 		dateOpen: t.dateOpen || nowStamp(),
@@ -179,15 +180,15 @@ export function normalizeTrade(raw) {
 		direction: t.direction === 'short' ? 'short' : 'long',
 		volume: Number(t.volume) || 0.01,
 		priceOpen: Number(t.priceOpen) || 0,
-		sl: t.sl == null || t.sl === '' ? null : Number(t.sl),
-		tp: t.tp == null || t.tp === '' ? null : Number(t.tp),
+		sl: t.sl == null || (t.sl as unknown) === '' ? null : Number(t.sl),
+		tp: t.tp == null || (t.tp as unknown) === '' ? null : Number(t.tp),
 		status: t.status === 'closed' ? 'closed' : 'open',
 		dateClose: t.dateClose || null,
-		priceClose: t.priceClose == null || t.priceClose === '' ? null : Number(t.priceClose),
+		priceClose: t.priceClose == null || (t.priceClose as unknown) === '' ? null : Number(t.priceClose),
 		commission: Number(t.commission) || 0,
 		swap: Number(t.swap) || 0,
-		profit: t.profit == null || t.profit === '' ? null : Number(t.profit),
-		contractSize: t.contractSize == null || t.contractSize === '' ? null : Number(t.contractSize),
+		profit: t.profit == null || (t.profit as unknown) === '' ? null : Number(t.profit),
+		contractSize: t.contractSize == null || (t.contractSize as unknown) === '' ? null : Number(t.contractSize),
 		tags: Array.isArray(t.tags) ? t.tags.map(String) : [],
 		comment: String(t.comment || ''),
 		attachments: Array.isArray(t.attachments) ? t.attachments.map(String) : []
@@ -199,8 +200,8 @@ export function normalizeTrade(raw) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** P/L сделки: (close-open) × dir × contract × volume − commission − swap. */
-export function calculateProfit(trade) {
-	const t = trade || {};
+export function calculateProfit(trade: Partial<Trade> | null | undefined): number {
+	const t = (trade || {}) as Partial<Trade>;
 	const open = Number(t.priceOpen) || 0;
 	const close = Number(t.priceClose) || 0;
 	const volume = Number(t.volume) || 0;
@@ -214,11 +215,11 @@ export function calculateProfit(trade) {
 }
 
 /** Итоговый P/L для отображения: сохранённый profit (MT5) или расчётный. */
-export function tradeProfit(trade) {
+export function tradeProfit(trade: Trade | null | undefined): number {
 	if (isBrokerImported(trade) && Number.isFinite(Number(trade?.profit))) {
-		return Number(trade.profit);
+		return Number(trade!.profit);
 	}
-	if (Number.isFinite(Number(trade?.profit)) && trade?.profit !== null) {
+	if (trade?.profit != null && Number.isFinite(Number(trade.profit))) {
 		return Number(trade.profit);
 	}
 	if (trade?.status === 'closed' && trade?.priceClose != null) return calculateProfit(trade);
@@ -226,7 +227,7 @@ export function tradeProfit(trade) {
 }
 
 /** Движение цены в пипсах (положительно = в плюс). */
-export function calculatePips(trade) {
+export function calculatePips(trade: Trade | null | undefined): number | null {
 	if (!trade || trade.priceClose == null) return null;
 	const open = Number(trade.priceOpen) || 0;
 	const close = Number(trade.priceClose) || 0;
@@ -239,7 +240,7 @@ export function calculatePips(trade) {
 }
 
 /** Движение цены в процентах. */
-export function calculatePricePercent(trade) {
+export function calculatePricePercent(trade: Trade | null | undefined): number | null {
 	if (!trade || trade.priceClose == null) return null;
 	const open = Number(trade.priceOpen) || 0;
 	if (open === 0) return null;
@@ -250,14 +251,16 @@ export function calculatePricePercent(trade) {
 }
 
 /** Происхождение сделки: 'mt5-history' | 'mt5-trade' | 'manual'. */
-export function tradeSource(trade) {
+export type TradeSource = 'mt5-history' | 'mt5-trade' | 'manual';
+
+export function tradeSource(trade: Partial<Trade> | null | undefined): TradeSource {
 	const tags = Array.isArray(trade?.tags) ? trade.tags : [];
 	if (tags.includes('mt5-history-report')) return 'mt5-history';
 	if (tags.includes('mt5-trade-report')) return 'mt5-trade';
 	return 'manual';
 }
 
-export function isBrokerImported(trade) {
+export function isBrokerImported(trade: Partial<Trade> | null | undefined): boolean {
 	return tradeSource(trade) !== 'manual';
 }
 
@@ -266,13 +269,13 @@ export function isBrokerImported(trade) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Число с фиксированными знаками. */
-export function formatNumber(value, decimals = 2) {
+export function formatNumber(value: unknown, decimals = 2): string {
 	if (value == null || !Number.isFinite(Number(value))) return '—';
 	return Number(value).toFixed(decimals);
 }
 
 /** Адаптивная точность цены по величине актива. */
-export function formatPrice(value) {
+export function formatPrice(value: unknown): string {
 	if (value == null || !Number.isFinite(Number(value))) return '—';
 	const v = Math.abs(Number(value));
 	const d = v >= 1000 ? 2 : v >= 100 ? 3 : v >= 10 ? 4 : v >= 1 ? 5 : v >= 0.01 ? 6 : 8;
@@ -280,7 +283,7 @@ export function formatPrice(value) {
 }
 
 /** Деньги со знаком и валютой счёта. */
-export function formatMoney(value, currency = 'USD', signed = false) {
+export function formatMoney(value: unknown, currency = 'USD', signed = false): string {
 	if (value == null || !Number.isFinite(Number(value))) return '—';
 	const v = Number(value);
 	const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '';
@@ -294,7 +297,7 @@ export function formatMoney(value, currency = 'USD', signed = false) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Разобрать 'YYYY-MM-DD HH:mm:ss' как локальное время. */
-export function parseStamp(value) {
+export function parseStamp(value: unknown): Date | null {
 	if (!value) return null;
 	const s = String(value).trim().replace(' ', 'T');
 	const d = new Date(s);
@@ -307,10 +310,12 @@ export function parseStamp(value) {
 }
 
 /** Форматирование даты: 'DD.MM.YY HH:mm' по умолчанию. */
-export function formatDate(value, style = 'short') {
+export type DateStyle = 'short' | 'date' | 'full';
+
+export function formatDate(value: unknown, style: DateStyle = 'short'): string {
 	const d = parseStamp(value);
 	if (!d) return '—';
-	const p = (n) => String(n).padStart(2, '0');
+	const p = (n: number) => String(n).padStart(2, '0');
 	const date = `${p(d.getDate())}.${p(d.getMonth() + 1)}.${String(d.getFullYear()).slice(2)}`;
 	if (style === 'date') return date;
 	if (style === 'full') return `${date} ${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -318,19 +323,19 @@ export function formatDate(value, style = 'short') {
 }
 
 /** Ключ дня 'YYYY-MM-DD'. */
-export function dayKey(value) {
+export function dayKey(value: unknown): string | null {
 	const d = parseStamp(value);
 	if (!d) return null;
-	const p = (n) => String(n).padStart(2, '0');
+	const p = (n: number) => String(n).padStart(2, '0');
 	return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 /** Длительность между двумя метками: '2ч 15м', '45м', '3д 4ч'. */
-export function formatDuration(start, end) {
+export function formatDuration(start: unknown, end?: unknown): string {
 	const s = parseStamp(start);
 	const e = end ? parseStamp(end) : new Date();
 	if (!s || !e) return '—';
-	const sec = Math.max(0, Math.floor((e - s) / 1000));
+	const sec = Math.max(0, Math.floor((e.getTime() - s.getTime()) / 1000));
 	if (sec < 60) return `${sec}с`;
 	const min = Math.floor(sec / 60);
 	if (min < 60) return `${min}м`;

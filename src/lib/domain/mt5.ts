@@ -1,3 +1,8 @@
+import type { Trade } from './trades.ts';
+
+/** Сделка из отчёта MT5: к полям Trade добавляется метка шаблона (всегда null). */
+type ImportedTrade = Trade & { templateUsed: null };
+
 /**
  * Парсер HTML-отчётов MetaTrader 5.
  *
@@ -10,8 +15,7 @@
  *  3) сохранён экспорт `parseNumber` / `parseMt5Date` для тестов домена.
  */
 
-/** @param {unknown} value */
-function cleanText(value) {
+function cleanText(value: unknown): string {
 	return String(value || '')
 		.replace(/\u00a0/g, ' ')
 		.replace(/\s+/g, ' ')
@@ -22,8 +26,7 @@ function cleanText(value) {
  * Число из ячейки MT5: локали с «1.234,56» / «1,234.56», валютные символы, скобки.
  * Раньше одна замена «,»→«.» давала NaN на EU-формате → прибыль 0.
  */
-/** @param {unknown} value */
-export function parseNumber(value) {
+export function parseNumber(value: unknown): number {
 	let s = cleanText(value);
 	if (!s) return 0;
 
@@ -70,14 +73,12 @@ export function parseNumber(value) {
 	return number;
 }
 
-/** @param {unknown} typeValue */
-function normalizeDirection(typeValue) {
+function normalizeDirection(typeValue: unknown): 'long' | 'short' {
 	const type = cleanText(typeValue).toLowerCase();
 	return type.includes('sell') ? 'short' : 'long';
 }
 
-/** @param {unknown} mt5Date */
-function normalizeDate(mt5Date) {
+function normalizeDate(mt5Date: unknown): string | null {
 	const value = cleanText(mt5Date);
 	if (!value) return null;
 	return value.replace(/\./g, '-');
@@ -86,30 +87,26 @@ function normalizeDate(mt5Date) {
 /** Дата MT5 → 'YYYY-MM-DD HH:mm:ss'. */
 export const parseMt5Date = normalizeDate;
 
-/** @param {Element} row */
-function getRowValues(row) {
+function getRowValues(row: Element): string[] {
 	return Array.from(row.querySelectorAll('td')).map((cell) => cleanText(cell.textContent));
 }
 
 /** Нормализация заголовков секций MT5: регистр, ё→е */
-/** @param {unknown} value */
-function normalizeSectionHeader(value) {
+function normalizeSectionHeader(value: unknown): string {
 	return cleanText(value)
 		.toLowerCase()
 		.replace(/\u0451/g, '\u0435');
 }
 
 /** Лейбл строки отчёта (Имя / Средства / …): для точного матчинга, без ложных includes. */
-/** @param {unknown} value */
-function normalizeReportLabel(value) {
+function normalizeReportLabel(value: unknown): string {
 	return normalizeSectionHeader(value)
 		.replace(/[:：]/g, '')
 		.trim();
 }
 
 /** Ячейка-лейбл в сводке MT5: «Баланс:», «Свободная маржа:» (не заголовок колонки «Баланс»). */
-/** @param {unknown} text */
-function isReportLabelCell(text) {
+function isReportLabelCell(text: unknown): boolean {
 	const t = cleanText(text);
 	return t.length > 0 && /[:：]\s*$/.test(t);
 }
@@ -119,8 +116,12 @@ function isReportLabelCell(text) {
  * иначе строки «Торговый счёт», «Баланс» не попадают в выборку.
  * В одной строке может быть несколько пар (Баланс + Свободная маржа) — не брать последнюю ячейку.
  */
-/** @param {Document} doc */
-function collectStatementPairs(doc) {
+interface StatementPair {
+	label: string;
+	valueText: string;
+}
+
+function collectStatementPairs(doc: Document): StatementPair[] {
 	const pairs = [];
 	for (const row of doc.querySelectorAll('tr')) {
 		const cells = Array.from(row.querySelectorAll('th, td'));
@@ -146,8 +147,7 @@ function collectStatementPairs(doc) {
 }
 
 /** Совпадение лейбла: точное или «лейбл начинается с alias + пробел/скобка» (не substring внутри другого слова). */
-/** @param {string|null} normLabel @param {string|null} aliasNorm */
-function labelMatchesAlias(normLabel, aliasNorm) {
+function labelMatchesAlias(normLabel: string | null, aliasNorm: string | null): boolean {
 	if (!normLabel || !aliasNorm) return false;
 	if (normLabel === aliasNorm) return true;
 	if (normLabel.startsWith(`${aliasNorm} (`)) return true;
@@ -156,12 +156,11 @@ function labelMatchesAlias(normLabel, aliasNorm) {
 	return normLabel.startsWith(`${aliasNorm} `);
 }
 
-/**
- * @param {{label: string, valueText: string}[]} pairs
- * @param {string[]} aliases
- * @param {{rejectLabelRe?: RegExp}} [opts]
- */
-function pickByAliases(pairs, aliases, opts = {}) {
+function pickByAliases(
+	pairs: StatementPair[],
+	aliases: string[],
+	opts: { rejectLabelRe?: RegExp } = {}
+): string | null {
 	const rejectRe = opts.rejectLabelRe;
 	const aliasNorms = aliases.map((a) => normalizeReportLabel(a));
 	for (const p of pairs) {
@@ -174,13 +173,8 @@ function pickByAliases(pairs, aliases, opts = {}) {
 	return null;
 }
 
-/**
- * Строки секции по любому из синонимов заголовка (RU/EN).
- * @param {Document} doc
- * @param {string[]} sectionAliases
- */
-function getSectionRowsMulti(doc, sectionAliases) {
-	const targets = [...new Set(sectionAliases.map((/** @type {string} */ a) => normalizeSectionHeader(a)).filter(Boolean))];
+function getSectionRowsMulti(doc: Document, sectionAliases: string[]): Element[] {
+	const targets = [...new Set(sectionAliases.map(( a) => normalizeSectionHeader(a)).filter(Boolean))];
 	const allRows = Array.from(doc.querySelectorAll('tr'));
 	const sectionRows = [];
 	let inSection = false;
@@ -209,13 +203,11 @@ function getSectionRowsMulti(doc, sectionAliases) {
 	return sectionRows;
 }
 
-/** @param {Document} doc @param {string} sectionName */
-function getSectionRows(doc, sectionName) {
+function getSectionRows(doc: Document, sectionName: string): Element[] {
 	return getSectionRowsMulti(doc, [sectionName]);
 }
 
-/** @param {string[]} values */
-function buildOpenTrade(values) {
+function buildOpenTrade(values: string[]): ImportedTrade | null {
 	// "Торговый отчет" / секция "Позиции" (открытые):
 	// [0]Символ [1]Позиция [2]Время [3]Тип [4]Объем [5]Цена [6]S/L [7]T/P
 	// [8]Рыночная цена [9]Своп [10]Прибыль(плавающая) [11]Комментарий
@@ -223,7 +215,7 @@ function buildOpenTrade(values) {
 	const pair = values[0];
 	const position = values[1];
 	if (!/^\d+$/.test(position)) return null;
-	const dateOpen = normalizeDate(values[2]);
+	const dateOpen = normalizeDate(values[2]) ?? '';
 	const direction = normalizeDirection(values[3]);
 	const volume = parseNumber(values[4]);
 	const priceOpen = parseNumber(values[5]);
@@ -251,17 +243,15 @@ function buildOpenTrade(values) {
 		commission: 0,
 		swap,
 		profit: floatingProfit,
+		contractSize: null,
 		tags: ['mt5', 'mt5-trade-report'],
 		templateUsed: null,
+		attachments: [],
 		comment
 	};
 }
 
-/**
- * Ячейка «Торговый счёт»: `112079 (USD, FundedTradingPlus-Live, real, Hedge)` → валюта, тип счёта и т.д.
- * @param {string} valueText
- */
-function parseTradingAccountCell(valueText) {
+function parseTradingAccountCell(valueText: string) {
 	const s = cleanText(valueText);
 	const m = s.match(
 		/^([A-Za-z0-9]+)\s*\(\s*([^,]+?)\s*,\s*([^,]+?)\s*,\s*([^,)]+?)\s*(?:,\s*([^)]+?))?\s*\)\s*$/i
@@ -280,8 +270,7 @@ function parseTradingAccountCell(valueText) {
 /**
  * Пары ключей из шапки отчёта MT5 (RU/EN) для метаданных импорта.
  */
-/** @param {Document} doc */
-function extractMt5StatementMeta(doc) {
+function extractMt5StatementMeta(doc: Document) {
 	const pairs = collectStatementPairs(doc);
 
 	/** Строка «Торговый счёт» — точные алиасы (includes('счет') ломал бы матч «Торговый счёт» как login). */
@@ -351,7 +340,7 @@ function extractMt5StatementMeta(doc) {
 		if (tok) ccy = tok[1];
 	}
 
-	const summary =
+	const summary: Mt5Summary | null =
 		fundsNum != null
 			? {
 					equity: fundsNum != null && Number.isFinite(fundsNum) ? fundsNum : null,
@@ -379,15 +368,14 @@ function extractMt5StatementMeta(doc) {
 	};
 }
 
-/** @param {string[]} values */
-function buildClosedPositionFromHistory(values) {
+function buildClosedPositionFromHistory(values: string[]): ImportedTrade | null {
 	// Формат блока "Позиции" в "Отчете торговой истории" MT5:
 	// [0]Время(откр) [1]Позиция [2]Символ [3]Тип [4]hidden(colspan=8)
 	// [5]Объем [6]Цена(откр) [7]S/L [8]T/P [9]Время(закр) [10]Цена(закр)
 	// [11]Комиссия [12]Своп [13]Прибыль(colspan=2)
 	if (values.length < 14) return null;
 
-	const dateOpen = normalizeDate(values[0]);
+	const dateOpen = normalizeDate(values[0]) ?? '';
 	const positionId = values[1];
 	const pair = values[2];
 	const type = cleanText(values[3]).toLowerCase();
@@ -423,17 +411,37 @@ function buildClosedPositionFromHistory(values) {
 		commission,
 		swap,
 		profit,
+		contractSize: null,
 		tags: ['mt5', 'mt5-history-report'],
 		templateUsed: null,
+		attachments: [],
 		comment: ''
 	};
 }
 
-/**
- * Разобрать HTML-отчёт MT5.
- * @param {string} htmlContent
- */
-export function parseMt5Report(htmlContent) {
+export interface Mt5Summary {
+	equity: number | null;
+	equityDisplay?: string | null;
+	fundsFromBalance: boolean;
+}
+
+export interface Mt5ParseResult {
+	reportType: 'trade' | 'history' | null;
+	trades: ImportedTrade[];
+	statementCurrency: string | null;
+	reportGeneratedAt: string | null;
+	summary: Mt5Summary | null;
+	balanceRaw: string | null;
+	fundsRaw: string | null;
+	accountTitle: string | null;
+	importAccountKind: string | null;
+	importAccountServer: string | null;
+	importAccountHedgeMode: string | null;
+	looksLikeMt5: boolean;
+	parseHint: string | null;
+}
+
+export function parseMt5Report(htmlContent: string): Mt5ParseResult {
 	const raw = String(htmlContent || '');
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(raw, 'text/html');
@@ -447,8 +455,7 @@ export function parseMt5Report(htmlContent) {
 	const loadPositionRows = () => getSectionRowsMulti(doc, positionSectionAliases);
 	const loadDealRows = () => getSectionRowsMulti(doc, dealsSectionAliases);
 
-	/** @type {null | 'trade' | 'history'} */
-	let reportKind = null;
+		let reportKind: 'trade' | 'history' | null = null;
 	if (
 		titleNorm.includes('торговый отчет') ||
 		titleNorm.includes('trade report') ||
@@ -467,7 +474,7 @@ export function parseMt5Report(htmlContent) {
 		const rows = loadPositionRows();
 		if (rows.length) {
 			const vals = rows.map(getRowValues);
-			const nHist = vals.map(buildClosedPositionFromHistory).filter((t) => t != null).length;
+			const nHist = vals.map(buildClosedPositionFromHistory).filter((t): t is ImportedTrade => t != null).length;
 			const nTrade = vals.map(buildOpenTrade).filter((t) => t != null).length;
 			if (nHist > 0 && nHist >= nTrade) reportKind = 'history';
 			else if (nTrade > 0) reportKind = 'trade';
@@ -491,7 +498,7 @@ export function parseMt5Report(htmlContent) {
 			: 'Не похоже на HTML-экспорт MT5. Сохраните из терминала: контекстное меню журнала → Отчёт, или отчёт по истории с блоком «Сделки».'
 	});
 
-	const baseMeta = {
+	const baseMeta: Omit<Mt5ParseResult, 'reportType' | 'trades'> & { parseHint: string | null } = {
 		statementCurrency: meta.statementCurrency || null,
 		reportGeneratedAt: meta.reportGeneratedAt || null,
 		summary: meta.summary,
@@ -510,7 +517,7 @@ export function parseMt5Report(htmlContent) {
 		const trades = rows
 			.map(getRowValues)
 			.map(buildOpenTrade)
-			.filter((/** @type {any} */ t) => t != null);
+			.filter(( t) => t != null);
 		return {
 			reportType: 'trade',
 			trades,
@@ -524,7 +531,7 @@ export function parseMt5Report(htmlContent) {
 		const trades = positionRows
 			.map(getRowValues)
 			.map(buildClosedPositionFromHistory)
-			.filter((/** @type {any} */ t) => t != null);
+			.filter(( t) => t != null);
 
 		const dealRows = loadDealRows();
 		const dealComments = new Map();
@@ -563,13 +570,7 @@ export function parseMt5Report(htmlContent) {
 	};
 }
 
-/**
- * Декодировать HTML-отчёт: MT5 сохраняет файлы в UTF-16 LE с BOM,
- * а FileReader.readAsText / file.text() читают как UTF-8 и получают NUL-байты.
- * @param {ArrayBuffer} buf
- * @returns {string}
- */
-export function decodeMt5Html(buf) {
+export function decodeMt5Html(buf: ArrayBuffer): string {
 	const bytes = new Uint8Array(buf);
 	if (bytes.length >= 2) {
 		if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes.subarray(2));
@@ -586,11 +587,7 @@ export function decodeMt5Html(buf) {
 	return new TextDecoder('utf-8').decode(bytes);
 }
 
-/**
- * Сгенерировать демо-сделки для оценки интерфейса.
- * @param {number} count
- */
-export function demoMt5Report(count = 24) {
+export function demoMt5Report(count = 24): Trade[] {
 	const pairs = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY', 'US100', 'GBPJPY'];
 	const comments = [
 		'FVG + OTE вход в лондонскую сессию',
@@ -600,8 +597,7 @@ export function demoMt5Report(count = 24) {
 		'Стоп по структуре, вышел в минус',
 		'Частичный фикс на 2R'
 	];
-	/** @type {any[]} */
-	const out = [];
+		const out: Trade[] = [];
 	const now = new Date();
 	for (let i = 0; i < count; i++) {
 		const pair = pairs[i % pairs.length];
@@ -636,15 +632,14 @@ export function demoMt5Report(count = 24) {
 			profit: null,
 			contractSize: null,
 			tags: ['mt5-history-report'],
-			templateUsed: null,
-			comment: comments[i % comments.length]
+			comment: comments[i % comments.length],
+			attachments: []
 		});
 	}
 	return out;
 }
 
-/** @param {Date} date */
-function stampOf(date) {
-	const p = (/** @type {number} */ n) => String(n).padStart(2, '0');
+function stampOf(date: Date): string {
+	const p = (n: number) => String(n).padStart(2, '0');
 	return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
 }

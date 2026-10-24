@@ -5,18 +5,18 @@ try {
 		const { Window } = await import(
 			'/home/an/Projects/TradeJornalApp/trader-journal/node_modules/happy-dom/lib/index.js'
 		);
-		globalThis.DOMParser = new Window().DOMParser;
+		(globalThis as { DOMParser?: unknown }).DOMParser = new (Window as any)().DOMParser;
 	}
 } catch {
 	console.log('DOMParser недоступен — тесты разбора MT5 будут пропущены');
 }
 
-import { calculateProfit, tradeProfit, calculatePips, normalizeTrade, formatMoney, formatDuration, dayKey } from '/home/an/Projects/TradeJornalApp/trader-journal/nd_true-journal/src/lib/domain/trades.js';
-import { filterTrades, sortTrades, computeTotals, groupByDay, equityCurve, emptyFilters } from '/home/an/Projects/TradeJornalApp/trader-journal/nd_true-journal/src/lib/domain/journal.js';
-import { parseMt5Report, parseNumber, parseMt5Date, demoMt5Report, decodeMt5Html } from '/home/an/Projects/TradeJornalApp/trader-journal/nd_true-journal/src/lib/domain/mt5.js';
+import { calculateProfit, tradeProfit, calculatePips, normalizeTrade, formatMoney, formatDuration, dayKey, type Trade } from './trades.ts';
+import { filterTrades, sortTrades, computeTotals, groupByDay, equityCurve, emptyFilters } from './journal.ts';
+import { parseMt5Report, parseNumber, parseMt5Date, demoMt5Report, decodeMt5Html } from './mt5.ts';
 
 let pass = 0, fail = 0;
-const eq = (name, a, b) => {
+const eq = (name: string, a: unknown, b: unknown) => {
   const ok = JSON.stringify(a) === JSON.stringify(b);
   if (ok) pass++; else { fail++; console.log('FAIL', name, '→', a, '≠', b); }
 };
@@ -28,9 +28,9 @@ eq('profit XAU', calculateProfit({pair:'XAUUSD',direction:'long',volume:0.1,pric
 eq('comm+swap', calculateProfit({pair:'EURUSD',direction:'long',volume:1,priceOpen:1.10,priceClose:1.11,commission:3,swap:-1}), 998);
 
 // pips
-eq('pips EURUSD', Math.round(calculatePips({pair:'EURUSD',direction:'long',priceOpen:1.1000,priceClose:1.1050})), 50);
-eq('pips JPY', calculatePips({pair:'USDJPY',direction:'long',priceOpen:150,priceClose:150.5}), 50);
-eq('pips XAU', calculatePips({pair:'XAUUSD',direction:'long',priceOpen:2000,priceClose:2005}), 50);
+eq('pips EURUSD', Math.round(calculatePips({pair:'EURUSD',direction:'long',priceOpen:1.1000,priceClose:1.1050} as Trade)!), 50);
+eq('pips JPY', calculatePips({pair:'USDJPY',direction:'long',priceOpen:150,priceClose:150.5} as Trade), 50);
+eq('pips XAU', calculatePips({pair:'XAUUSD',direction:'long',priceOpen:2000,priceClose:2005} as Trade), 50);
 
 // форматирование
 eq('money neg', formatMoney(-123.456,'USD'), '−123.46 $');

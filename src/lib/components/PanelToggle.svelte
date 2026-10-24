@@ -1,20 +1,5 @@
-<script>
-	/**
-	 * Переключатель из двух состояний для шапок панелей.
-	 * Переиспользуемый: работает с любым блоком через bind:expanded.
-	 *
-	 *   <SizeToggle bind:expanded={chartExpanded} />
-	 *
-	 * Иконка: развёрнуто — «свернуть» (две стрелки внутрь),
-	 * свёрнуто — «развернуть» (две стрелки наружу).
-	 * @type {{
-	 *   expanded?: boolean,
-	 *   labelExpand?: string,
-	 *   labelCollapse?: string,
-	 *   title?: string
-	 * }}
-	 */
-	let {
+<script lang="ts">
+		let {
 		expanded = $bindable(false),
 		labelExpand = 'Развернуть',
 		labelCollapse = 'Свернуть',

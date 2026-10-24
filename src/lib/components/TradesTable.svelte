@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	/**
 	 * Таблица сделок: фильтры, сортировка, пагинация, группировка по дням, итоги.
 	 * Без зависимостей. Все данные приходят пропсами — компонент не знает о хранилище.
@@ -12,32 +12,36 @@
 		calculatePips,
 		calculatePricePercent,
 		tradeSource,
-		tradeProfit
-	} from '#lib/domain/trades.js';
+		tradeProfit,
+		type Trade
+	} from '#lib/domain/trades.ts';
 	import {
 		sortIndicator,
 		toggleSort,
 		computeTotals,
-		groupByDay
-	} from '#lib/domain/journal.js';
+		groupByDay,
+		emptyFilters,
+		type Filters,
+		type SortState
+	} from '#lib/domain/journal.ts';
 
-	/** @type {{
-	 *   trades?: any[],
-	 *   sort?: {key: string, dir: 'asc'|'desc'},
-	 *   filters?: any,
-	 *   symbols?: string[],
-	 *   visibleCols?: Record<string, boolean>,
-	 *   pageSize?: number,
-	 *   currency?: string,
-	 *   onEdit?: (t:any)=>void,
-	 *   onDelete?: (t:any)=>void,
-	 *   onDuplicate?: (t:any)=>void,
-	 * }} */
+	interface Props {
+		trades?: Trade[];
+		sort?: SortState;
+		filters?: Filters;
+		symbols?: string[];
+		visibleCols?: Record<string, boolean>;
+		pageSize?: number;
+		currency?: string;
+		onEdit?: (trade: Trade) => void;
+		onDelete?: (trade: Trade) => void;
+		onDuplicate?: (trade: Trade) => void;
+	}
+
 	let {
 		trades = [],
-		/** @type {{key: string, dir: 'asc'|'desc'}} */
 		sort = $bindable({ key: 'dateClose', dir: 'desc' }),
-		filters = $bindable(),
+		filters = $bindable(emptyFilters()),
 		symbols = [],
 		visibleCols = {},
 		pageSize = 50,
@@ -45,10 +49,10 @@
 		onEdit = () => {},
 		onDelete = () => {},
 		onDuplicate = () => {}
-	} = $props();
+	}: Props = $props();
 
 	let page = $state(0);
-	let rowMenu = $state(/** @type {{trade:any,x:number,y:number}|null} */ (null));
+	let rowMenu = $state<{ trade: Trade; x: number; y: number } | null>(null);
 
 	const pages = $derived(Math.max(1, Math.ceil(trades.length / pageSize)));
 	const pageTrades = $derived(trades.slice(page * pageSize, (page + 1) * pageSize));
@@ -75,9 +79,8 @@
 		if (page > 0 && page >= pages) page = pages - 1;
 	});
 
-	/** @param {{currentTarget: EventTarget & Element}} event @param {any} trade */
-	function openMenu(event, trade) {
-		const r = event.currentTarget.getBoundingClientRect();
+	function openMenu(event: MouseEvent, trade: Trade) {
+		const r = (event.currentTarget as HTMLElement).getBoundingClientRect();
 		const menuH = 130; // примерная высота меню из 3 пунктов
 		// Переворот вверх, если меню не влезает снизу
 		const below = window.innerHeight - r.bottom - 8 > menuH;
@@ -88,8 +91,7 @@
 		};
 	}
 
-	/** @param {(t: any) => void} fn @param {any} trade */
-	function runAction(fn, trade) {
+	function runAction(fn: (t: Trade) => void, trade: Trade) {
 		rowMenu = null;
 		fn(trade);
 	}

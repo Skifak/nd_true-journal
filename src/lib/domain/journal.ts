@@ -2,21 +2,47 @@
  * Фильтрация, сортировка и агрегаты для списка сделок.
  * Чистые функции: зависят только от переданных аргументов.
  */
-import { dayKey, tradeProfit, tradeSource } from './trades.js';
+import { dayKey, tradeProfit, tradeSource, type Trade } from './trades.ts';
 
-/**
- * @typedef {Object} Filters
- * @property {string} symbolFilter
- * @property {string} directionFilter
- * @property {string} sltpFilter    '' | 'yes' | 'no'
- * @property {string} sourceFilter  '' | 'manual' | 'mt5-history' | 'mt5-trade'
- * @property {boolean} onlyWins
- * @property {boolean} onlyLosses
- * @property {string} search
- */
+export interface Filters {
+	symbolFilter: string;
+	directionFilter: string;
+	/** '' | 'yes' | 'no' */
+	sltpFilter: string;
+	/** '' | 'manual' | 'mt5-history' | 'mt5-trade' */
+	sourceFilter: string;
+	onlyWins: boolean;
+	onlyLosses: boolean;
+	search: string;
+}
 
-/** @returns {Filters} */
-export function emptyFilters() {
+export type SortDir = 'asc' | 'desc';
+
+export interface SortState {
+	key: string;
+	dir: SortDir;
+}
+
+export interface Totals {
+	profit: number;
+	commission: number;
+	swap: number;
+	wins: number;
+	losses: number;
+	breakeven: number;
+	winRate: number;
+	count: number;
+}
+
+export interface DayGroup {
+	dayKey: string | null;
+	trades: Trade[];
+	profit: number;
+	wins: number;
+	losses: number;
+}
+
+export function emptyFilters(): Filters {
 	return {
 		symbolFilter: '',
 		directionFilter: '',
@@ -29,7 +55,7 @@ export function emptyFilters() {
 }
 
 /** Текстовая проверка: пара, комментарий, направление, теги. */
-function matchesSearch(trade, q) {
+function matchesSearch(trade: Trade, q: string): boolean {
 	if (!q) return true;
 	const blob = [
 		trade.pair,
@@ -43,12 +69,7 @@ function matchesSearch(trade, q) {
 	return blob.includes(q);
 }
 
-/**
- * Отфильтровать сделки.
- * @param {any[]} trades
- * @param {Filters} filters
- */
-export function filterTrades(trades, filters) {
+export function filterTrades(trades: Trade[], filters: Filters): Trade[] {
 	const q = String(filters.search || '')
 		.trim()
 		.toLowerCase();
@@ -68,7 +89,7 @@ export function filterTrades(trades, filters) {
 }
 
 /** Значение для сортировки по ключу. */
-export function sortValue(trade, key) {
+export function sortValue(trade: Trade, key: string): string | number {
 	switch (key) {
 		case 'dateOpen':
 			return new Date(String(trade.dateOpen).replace(' ', 'T')).getTime() || 0;
@@ -92,17 +113,12 @@ export function sortValue(trade, key) {
 			return Number.isFinite(s) && Number.isFinite(e) ? e - s : 0;
 		}
 		default:
-			return String(trade[key] ?? '');
+			return String((trade as unknown as Record<string, unknown>)[key] ?? '');
 	}
 }
 
-/**
- * Отсортировать копию массива.
- * @param {any[]} trades
- * @param {{key: string, dir: 'asc'|'desc'}} sort
- */
-export function sortTrades(trades, sort) {
-	const { key, dir } = sort || { key: 'dateClose', dir: 'desc' };
+export function sortTrades(trades: Trade[], sort: SortState): Trade[] {
+	const { key, dir } = sort || { key: 'dateClose', dir: 'desc' as SortDir };
 	const mult = dir === 'asc' ? 1 : -1;
 	return [...trades].sort((a, b) => {
 		const va = sortValue(a, key);
@@ -115,34 +131,28 @@ export function sortTrades(trades, sort) {
 	});
 }
 
-/**
- * Переключить направление сортировки по клику на колонку.
- * @param {{key: string, dir: 'asc'|'desc'}} sort
- * @param {string} key
- * @returns {{key: string, dir: 'asc'|'desc'}}
- */
-export function toggleSort(sort, key) {
+export function toggleSort(sort: SortState, key: string): SortState {
 	if (sort.key !== key) return { key, dir: 'desc' };
 	return { key, dir: sort.dir === 'desc' ? 'asc' : 'desc' };
 }
 
 /** Индикатор сортировки для заголовка колонки. */
-export function sortIndicator(sort, key) {
+export function sortIndicator(sort: SortState, key: string): string {
 	if (sort.key !== key) return '';
 	return sort.dir === 'desc' ? ' ↓' : ' ↑';
 }
 
-/**
- * Итоги по списку.
- * @param {any[]} trades
- */
-/**
- * Итоги по списку сделок.
- * @param {any[]} trades
- * @returns {{profit: number, commission: number, swap: number, wins: number, losses: number, breakeven: number, winRate: number, count: number}}
- */
-export function computeTotals(trades) {
-	const acc = { profit: 0, commission: 0, swap: 0, wins: 0, losses: 0, breakeven: 0 };
+export function computeTotals(trades: Trade[]): Totals {
+	const acc: Totals = {
+		profit: 0,
+		commission: 0,
+		swap: 0,
+		wins: 0,
+		losses: 0,
+		breakeven: 0,
+		winRate: 0,
+		count: 0
+	};
 	for (const t of trades) {
 		const p = tradeProfit(t);
 		acc.profit += p;
@@ -158,14 +168,9 @@ export function computeTotals(trades) {
 	return acc;
 }
 
-/**
- * Сгруппировать по дням (порядок сохраняется).
- * @param {any[]} trades
- */
-export function groupByDay(trades) {
-	/** @type {{dayKey: string, trades: any[], profit: number, wins: number, losses: number}[]} */
-	const groups = [];
-	let current = null;
+export function groupByDay(trades: Trade[]): DayGroup[] {
+	const groups: DayGroup[] = [];
+	let current: DayGroup | null = null;
 	for (const t of trades) {
 		const dk = dayKey(t.dateClose || t.dateOpen);
 		if (!current || current.dayKey !== dk) {
@@ -182,24 +187,25 @@ export function groupByDay(trades) {
 }
 
 /** Уникальные символы из списка (для пикера). */
-export function symbolsFromTrades(trades) {
+export function symbolsFromTrades(trades: Trade[]): string[] {
 	return [...new Set(trades.map((t) => t.pair).filter(Boolean))].sort((a, b) =>
 		a.localeCompare(b, 'ru')
 	);
 }
 
-/**
- * Кривая капитала: накопительный P/L по закрытым сделкам.
- * @param {any[]} trades закрытые сделки в нужном порядке
- * @param {number} startBalance
- * @returns {{values: number[], dates: string[], labels: string[]}}
- */
-export function equityCurve(trades, startBalance = 0) {
+export interface EquityCurve {
+	values: number[];
+	dates: string[];
+	labels: string[];
+}
+
+/** Кривая капитала: накопительный P/L по закрытым сделкам. */
+export function equityCurve(trades: Trade[], startBalance = 0): EquityCurve {
 	const closed = trades.filter((t) => t.status === 'closed');
 	let balance = Number(startBalance) || 0;
-	const values = [balance];
-	const dates = [];
-	const labels = [];
+	const values: number[] = [balance];
+	const dates: string[] = [];
+	const labels: string[] = [];
 	for (const t of closed) {
 		balance += tradeProfit(t);
 		values.push(Number(balance.toFixed(2)));
