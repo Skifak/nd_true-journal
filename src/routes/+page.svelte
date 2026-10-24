@@ -9,6 +9,26 @@
 	const RATIO_EXPANDED = 0.26;
 	let chartExpanded = $state(false);
 
+	// Демо-наборы данных для оценки графика (значения — % от старта, шкала 0..100)
+	const CHART_DATASETS = [
+		{
+			id: 'smooth',
+			label: 'ровный',
+			values: [0, 8, 14, 21, 27, 34, 40, 47, 53, 61, 68, 74]
+		},
+		{
+			id: 'volatile',
+			label: 'волатильный',
+			values: [12, 5, 28, 19, 44, 31, 58, 42, 71, 55, 88, 79]
+		},
+		{
+			id: 'drawdown',
+			label: 'просадка',
+			values: [18, 34, 52, 66, 81, 74, 58, 41, 26, 33, 45, 62]
+		}
+	];
+	let chartDataset = $state(0);
+
 	const app = namespaced('ndtj:app:');
 
 	let platform = $state(detectPlatform());
@@ -65,7 +85,24 @@
 			</div>
 		</div>
 		<div class="chart-slot" class:expanded={chartExpanded}>
-			<EquityChart heightRatio={chartExpanded ? RATIO_EXPANDED : RATIO_COMPACT} />
+			<EquityChart
+				values={CHART_DATASETS[chartDataset].values}
+				yMin={0}
+				yMax={100}
+				forecast={null}
+				heightRatio={chartExpanded ? RATIO_EXPANDED : RATIO_COMPACT}
+			/>
+		</div>
+		<div class="chart-sets" role="group" aria-label="Наборы данных графика">
+			{#each CHART_DATASETS as ds, i}
+				<button
+					type="button"
+					class="set-btn"
+					class:active={i === chartDataset}
+					aria-pressed={i === chartDataset}
+					onclick={() => (chartDataset = i)}>{ds.label}</button
+				>
+			{/each}
 		</div>
 	</div>
 
@@ -182,6 +219,43 @@
 	}
 	.chart-slot {
 		transition: opacity 0.3s var(--ease-out, ease);
+	}
+	.chart-sets {
+		display: flex;
+		gap: 1px;
+		margin-top: var(--sp-sm);
+		border-top: 1px solid var(--line);
+		padding-top: var(--sp-sm);
+	}
+	.set-btn {
+		flex: 1;
+		padding: 0.35rem 0.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--ink-muted);
+		background: transparent;
+		border: 1px solid var(--line);
+		border-radius: 2px;
+		cursor: pointer;
+		transition:
+			color 0.2s,
+			border-color 0.2s,
+			background 0.2s;
+	}
+	.set-btn:hover {
+		color: var(--ink);
+		border-color: var(--line-strong);
+	}
+	.set-btn.active {
+		color: var(--bg);
+		background: var(--sage);
+		border-color: var(--sage);
+	}
+	.set-btn:focus-visible {
+		outline: 1px solid var(--accent);
+		outline-offset: 2px;
 	}
 	.panel-title {
 		font-size: 1.35rem;

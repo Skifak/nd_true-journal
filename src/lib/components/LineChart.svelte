@@ -45,6 +45,9 @@
 		},
 		forecast = { from: 0.75, label: 'FORECAST' },
 		showPoints = true,
+		/** Фиксированные границы оси Y (для «шкалы 0..100%»); null — из данных */
+		yMin = null,
+		yMax = null,
 		stroke = 'var(--sage)',
 		fill = 'var(--ink)',
 		strokeWidth = 1.4
@@ -111,8 +114,10 @@
 	const geometry = $derived.by(() => {
 		const vals = safeValues;
 		const n = vals.length;
-		const min = Math.min(...vals);
-		const max = Math.max(...vals);
+		const dataMin = Math.min(...vals);
+		const dataMax = Math.max(...vals);
+		const min = yMin ?? dataMin;
+		const max = yMax ?? dataMax;
 		const range = max - min || 1;
 		const pts = vals.map((v, i) => [
 			padL + (n < 2 ? 0 : (i / (n - 1)) * (W - padL - padR)),
@@ -146,7 +151,7 @@
 		return geometry.pts[idx][0];
 	});
 
-	// Ось Y: 5 уровней
+	// Ось Y: 5 уровней в домене [min..max] (в т.ч. фиксированном 0..100)
 	const yTicks = $derived.by(() => {
 		const { min, max } = geometry;
 		const ticks = [];
