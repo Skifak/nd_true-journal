@@ -1,16 +1,21 @@
 <script>
 	/**
 	 * Заглушка графика в стиле nf-diagram/nf-chart (ink-orbit-saas-template).
+	 * Полная ширина: viewBox строится по реальной ширине контейнера (1:1, без искажений).
+	 * Высота = 16% ширины, зажата в [190..300]px.
 	 * Интерактив: crosshair-вертикаль, точка и тултип при наведении (как в оригинале).
-	 * Адаптив: viewBox фиксированный, высота ограничена, координаты указателя — из bbox.
 	 * @type {{values?: number[], title?: string}}
 	 */
 	let { values = [22, 26, 24, 31, 29, 36, 34, 42], title = 'Кривая капитала' } = $props();
 
-	const W = 300;
-	const H = 143;
-	const PAD = 14;
+	const PAD = 18;
 	const forecastFrom = 6;
+
+	// Реальная ширина контейнера → пиксельный viewBox (без леттербокса)
+	let wrapEl = $state(null);
+	let cw = $state(0);
+	const W = $derived(Math.max(320, Math.round(cw) || 640));
+	const H = $derived(Math.round(Math.min(300, Math.max(190, W * 0.16))));
 
 	// Геометрия (формула zn() из оригинала: C-сглаживание)
 	const geometry = $derived.by(() => {
@@ -43,10 +48,10 @@
 	const fcX = $derived(geometry.pts[Math.min(forecastFrom, geometry.pts.length - 1)][0]);
 
 	// --- Интерактивность (как в оригинале: pointermove → ближайшая точка) ---
-	let svgEl = $state(null);
 	let hoverIdx = $state(-1);
-
-	const active = $derived(hoverIdx >= 0 ? geometry.pts[hoverIdx] : geometry.pts[geometry.pts.length - 1]);
+	const active = $derived(
+		hoverIdx >= 0 ? geometry.pts[hoverIdx] : geometry.pts[geometry.pts.length - 1]
+	);
 
 	function nearestX(x) {
 		let best = 0;
@@ -57,10 +62,8 @@
 	}
 
 	function onMove(e) {
-		if (!svgEl) return;
-		const rect = svgEl.getBoundingClientRect();
-		const x = ((e.clientX - rect.left) / rect.width) * W;
-		hoverIdx = nearestX(x);
+		const rect = e.currentTarget.getBoundingClientRect();
+		hoverIdx = nearestX(((e.clientX - rect.left) / rect.width) * W);
 	}
 
 	// Подпись тултипа: дельта от первого значения в %
@@ -68,68 +71,117 @@
 		if (hoverIdx < 0) return '';
 		const v0 = values[0] || 1;
 		const d = Math.round(((values[hoverIdx] - v0) / v0) * 100);
-		return (hoverIdx >= forecastFrom ? 'pred ' : 'pt ' + (hoverIdx + 1) + ' ') + (d >= 0 ? '+' : '') + d + '%';
+		return (
+			(hoverIdx >= forecastFrom ? 'pred ' : 'pt ' + (hoverIdx + 1) + ' ') +
+			(d >= 0 ? '+' : '') +
+			d +
+			'%'
+		);
 	});
 
-	// Тултип не вылезает за края (адаптив)
-	const tipX = $derived(Math.min(W - 40, Math.max(40, active[0])));
-	const tipY = $derived(active[1] < 30 ? active[1] + 22 : active[1] - 12);
+	// Тултип не вылезает за края
+	const tipX = $derived(Math.min(W - 46, Math.max(46, active[0])));
+	const tipY = $derived(active[1] < 32 ? active[1] + 24 : active[1] - 14);
 </script>
 
-<svg
-	bind:this={svgEl}
-	class="diagram chart"
-	viewBox="0 0 {W} {H + 6}"
-	role="img"
-	aria-label={title}
-	onpointermove={onMove}
-	onpointerleave={() => (hoverIdx = -1)}
->
-	<defs>
-		<linearGradient id="{uid}-area" x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0" stop-color="var(--ink)" stop-opacity=".12" />
-			<stop offset="1" stop-color="var(--ink)" stop-opacity="0" />
-		</linearGradient>
-	</defs>
+<div class="wrap" bind:this={wrapEl} bind:clientWidth={cw}>
+	{#if cw > 0}
+		<svg
+			class="diagram chart"
+			width={W}
+			height={H + 6}
+			viewBox="0 0 {W} {H + 6}"
+			role="img"
+			aria-label={title}
+			onpointermove={onMove}
+			onpointerleave={() => (hoverIdx = -1)}
+		>
+			<defs>
+				<linearGradient id="{uid}-area" x1="0" y1="0" x2="0" y2="1">
+					<stop offset="0" stop-color="var(--ink)" stop-opacity=".12" />
+					<stop offset="1" stop-color="var(--ink)" stop-opacity="0" />
+				</linearGradient>
+			</defs>
 
-	{#each [0.25, 0.5, 0.75] as f}
-		<line x1={PAD} x2={W - PAD} y1={H * f} y2={H * f} stroke="var(--line)" />
-	{/each}
+			{#each [0.25, 0.5, 0.75] as f}
+				<line x1={PAD} x2={W - PAD} y1={H * f} y2={H * f} stroke="var(--line)" />
+			{/each}
 
-	<path d={geometry.area} fill="url(#{uid}-area)" />
-	<path d={geometry.line} fill="none" stroke="var(--sage)" stroke-width="1.4" pathLength="1" class="line-draw" opacity=".85" />
+			<path d={geometry.area} fill="url(#{uid}-area)" />
+			<path
+				d={geometry.line}
+				fill="none"
+				stroke="var(--sage)"
+				stroke-width="1.4"
+				pathLength="1"
+				class="line-draw"
+				opacity=".85"
+			/>
 
-	<!-- Пунктир прогноза -->
-	<line x1={fcX} x2={fcX} y1="10" y2={H - PAD} stroke="var(--line-strong)" stroke-dasharray="2 3" />
-	<text x={fcX - 4} y={H - 4} text-anchor="end" font-size="7" fill="var(--ink-muted)" font-family="var(--font-mono)" letter-spacing="1">FORECAST</text>
+			<!-- Пунктир прогноза -->
+			<line
+				x1={fcX}
+				x2={fcX}
+				y1="10"
+				y2={H - PAD}
+				stroke="var(--line-strong)"
+				stroke-dasharray="2 3"
+			/>
+			<text
+				x={fcX - 6}
+				y={H - 6}
+				text-anchor="end"
+				font-size="9"
+				fill="var(--ink-muted)"
+				font-family="var(--font-mono)"
+				letter-spacing="1.5">FORECAST</text
+			>
 
-	<!-- Кроссхейр при наведении -->
-	{#if hoverIdx >= 0}
-		<line x1={active[0]} x2={active[0]} y1="8" y2={H - PAD} stroke="var(--sage)" stroke-opacity=".35" />
+			<!-- Кроссхейр при наведении -->
+			{#if hoverIdx >= 0}
+				<line
+					x1={active[0]}
+					x2={active[0]}
+					y1="10"
+					y2={H - PAD}
+					stroke="var(--sage)"
+					stroke-opacity=".35"
+				/>
+			{/if}
+
+			<!-- Точка: покой (пульс) или активная -->
+			{#if hoverIdx < 0}
+				<circle cx={active[0]} cy={active[1]} r="8" fill="var(--sage)" opacity=".15" class="glow" />
+			{/if}
+			<circle
+				cx={active[0]}
+				cy={active[1]}
+				r="3.6"
+				fill="var(--bg)"
+				stroke="var(--sage)"
+				stroke-width="1.5"
+			/>
+
+			<!-- Тултип -->
+			{#if hoverIdx >= 0}
+				<g transform="translate({tipX},{tipY})">
+					<rect x="-36" y="-12" width="72" height="16" rx="2" fill="var(--ink)" />
+					<text x="0" y="-1" text-anchor="middle" font-size="8.5" fill="var(--bg)" font-family="var(--font-mono)"
+						>{delta}</text
+					>
+				</g>
+			{/if}
+		</svg>
 	{/if}
-
-	<!-- Точка: активная или покоящаяся с пульсом -->
-	{#if hoverIdx < 0}
-		<circle cx={active[0]} cy={active[1]} r="7" fill="var(--sage)" opacity=".15" class="glow" />
-	{/if}
-	<circle cx={active[0]} cy={active[1]} r="3.2" fill="var(--bg)" stroke="var(--sage)" stroke-width="1.5" />
-
-	<!-- Тултип -->
-	{#if hoverIdx >= 0}
-		<g transform="translate({tipX},{tipY})">
-			<rect x="-32" y="-11" width="64" height="15" rx="2" fill="var(--ink)" />
-			<text x="0" y="-1" text-anchor="middle" font-size="7.5" fill="var(--bg)" font-family="var(--font-mono)">{delta}</text>
-		</g>
-	{/if}
-</svg>
+</div>
 
 <style>
-	/* Адаптив: ширина 100%, высота ограничена — не тянется вверх на широких панелях */
+	.wrap {
+		width: 100%;
+		min-height: 120px;
+	}
 	.diagram {
 		display: block;
-		width: 100%;
-		max-height: 234px;
-		height: auto;
 		overflow: visible;
 	}
 	.chart {
