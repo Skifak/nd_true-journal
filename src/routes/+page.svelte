@@ -2,11 +2,12 @@
 	import { detectPlatform, isTauri } from '#lib/platform/index.js';
 	import { namespaced } from '#lib/storage/local.js';
 	import EquityChart from '#lib/components/EquityChart.svelte';
+	import PanelToggle from '#lib/components/PanelToggle.svelte';
 
-	// Высота графика: 3 шага (S/M/L), переключается кнопкой в шапке панели
-	const SIZE_RATIOS = [0.13, 0.17, 0.24];
-	const SIZE_LABELS = ['S', 'M', 'L'];
-	let chartSize = $state(1);
+	// График: 2 состояния — компактный / развёрнутый (кнопка в шапке панели)
+	const RATIO_COMPACT = 0.14;
+	const RATIO_EXPANDED = 0.26;
+	let chartExpanded = $state(false);
 
 	const app = namespaced('ndtj:app:');
 
@@ -55,16 +56,17 @@
 		<div class="panel-head">
 			<h2 class="panel-title">Кривая капитала</h2>
 			<div class="head-tools">
-				<button
-					class="size-btn"
-					onclick={() => (chartSize = (chartSize + 1) % 3)}
-					title="Изменить высоту графика"
-					aria-label="Изменить высоту графика: {SIZE_LABELS[chartSize]}"
-				>{SIZE_LABELS[chartSize]}</button>
+				<PanelToggle
+					bind:expanded={chartExpanded}
+					labelExpand="Развернуть график"
+					labelCollapse="Свернуть график"
+				/>
 				<span class="eyebrow">все сделки</span>
 			</div>
 		</div>
-		<EquityChart heightRatio={SIZE_RATIOS[chartSize]} />
+		<div class="chart-slot" class:expanded={chartExpanded}>
+			<EquityChart heightRatio={chartExpanded ? RATIO_EXPANDED : RATIO_COMPACT} />
+		</div>
 	</div>
 
 	<!-- Заметка дня -->
@@ -178,30 +180,8 @@
 		align-items: center;
 		gap: var(--sp-sm);
 	}
-	.size-btn {
-		width: 18px;
-		height: 18px;
-		display: grid;
-		place-items: center;
-		font-family: var(--font-mono);
-		font-size: 0.62rem;
-		line-height: 1;
-		color: var(--ink-muted);
-		background: transparent;
-		border: 1px solid var(--line);
-		border-radius: 2px;
-		cursor: pointer;
-		transition:
-			color 0.2s,
-			border-color 0.2s;
-	}
-	.size-btn:hover {
-		color: var(--ink);
-		border-color: var(--line-strong);
-	}
-	.size-btn:focus-visible {
-		outline: 1px solid var(--accent);
-		outline-offset: 2px;
+	.chart-slot {
+		transition: opacity 0.3s var(--ease-out, ease);
 	}
 	.panel-title {
 		font-size: 1.35rem;
