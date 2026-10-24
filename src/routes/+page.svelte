@@ -3,6 +3,11 @@
 	import { namespaced } from '#lib/storage/local.js';
 	import EquityChart from '#lib/components/EquityChart.svelte';
 
+	// Высота графика: 3 шага (S/M/L), переключается кнопкой в шапке панели
+	const SIZE_RATIOS = [0.13, 0.17, 0.24];
+	const SIZE_LABELS = ['S', 'M', 'L'];
+	let chartSize = $state(1);
+
 	const app = namespaced('ndtj:app:');
 
 	let platform = $state(detectPlatform());
@@ -49,9 +54,17 @@
 		<span class="fh-c fh-br" aria-hidden="true"></span>
 		<div class="panel-head">
 			<h2 class="panel-title">Кривая капитала</h2>
-			<span class="eyebrow">все сделки</span>
+			<div class="head-tools">
+				<button
+					class="size-btn"
+					onclick={() => (chartSize = (chartSize + 1) % 3)}
+					title="Изменить высоту графика"
+					aria-label="Изменить высоту графика: {SIZE_LABELS[chartSize]}"
+				>{SIZE_LABELS[chartSize]}</button>
+				<span class="eyebrow">все сделки</span>
+			</div>
 		</div>
-		<EquityChart />
+		<EquityChart heightRatio={SIZE_RATIOS[chartSize]} />
 	</div>
 
 	<!-- Заметка дня -->
@@ -159,6 +172,36 @@
 		padding-bottom: var(--sp-sm);
 		border-bottom: 1px solid var(--line);
 		margin-bottom: var(--sp-md);
+	}
+	.head-tools {
+		display: flex;
+		align-items: center;
+		gap: var(--sp-sm);
+	}
+	.size-btn {
+		width: 18px;
+		height: 18px;
+		display: grid;
+		place-items: center;
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		line-height: 1;
+		color: var(--ink-muted);
+		background: transparent;
+		border: 1px solid var(--line);
+		border-radius: 2px;
+		cursor: pointer;
+		transition:
+			color 0.2s,
+			border-color 0.2s;
+	}
+	.size-btn:hover {
+		color: var(--ink);
+		border-color: var(--line-strong);
+	}
+	.size-btn:focus-visible {
+		outline: 1px solid var(--accent);
+		outline-offset: 2px;
 	}
 	.panel-title {
 		font-size: 1.35rem;

@@ -11,7 +11,13 @@
 	 * Полная ширина (viewBox = реальные пиксели контейнера), высота ~17% ширины [200..320]px.
 	 * @type {{values?: number[], dates?: string[], title?: string}}
 	 */
-	let { values = [22, 26, 24, 31, 29, 36, 34, 42], dates = [], title = 'Кривая капитала' } = $props();
+	let {
+		values = [22, 26, 24, 31, 29, 36, 34, 42],
+		dates = [],
+		title = 'Кривая капитала',
+		/** Доля высоты от ширины контейнера (управляется кнопкой S/M/L) */
+		heightRatio = 0.17
+	} = $props();
 
 	const padT = 14;
 	const padB = 26;
@@ -56,7 +62,7 @@
 
 	// Ширина/высота в пикселях → viewBox 1:1 (без леттербокса)
 	const W = $derived(Math.max(340, Math.round(measured.width) || 720));
-	const H = $derived(Math.round(Math.min(320, Math.max(200, W * 0.17))));
+	const H = $derived(Math.round(Math.min(460, Math.max(150, W * heightRatio))));
 
 	// Даты: из журнала или демо-генерация (последние n дней)
 	const dateLabels = $derived.by(() => {
