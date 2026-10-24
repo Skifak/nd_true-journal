@@ -1,0 +1,230 @@
+/* nd true journal — дизайн-система
+   Адаптация «швейцарского терминала» с сайта журнала (journal-site/DESIGN.md),
+   но в плоском документном режиме: без стекла (backdrop-filter), без
+   анимированного фона и зерна. Глубина только тоном и волосяными линиями. */
+
+/* ---------- Шрифты (self-hosted, из journal-site/fonts) ---------- */
+@font-face {
+	font-family: 'Rubik';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/rubik-400-cyrillic.woff2') format('woff2');
+	unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+	font-family: 'Rubik';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/rubik-400-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+	font-family: 'Unbounded';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/unbounded-400-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+	font-family: 'Cormorant Garamond';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/cormorant-garamond-400-cyrillic.woff2') format('woff2');
+	unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+	font-family: 'Cormorant Garamond';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/cormorant-garamond-400-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+	font-family: 'Cormorant Garamond';
+	font-style: italic;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/cormorant-garamond-400-italic-cyrillic.woff2') format('woff2');
+	unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+	font-family: 'Cormorant Garamond';
+	font-style: italic;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/cormorant-garamond-400-italic-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ---------- Токены ---------- */
+:root {
+	/* Цвета — палитра журнала */
+	--bg: #161819;
+	--ink: rgba(243, 242, 240, 0.82);
+	--ink-muted: rgba(157, 174, 202, 0.75);
+	--accent: rgba(100, 137, 180, 0.55);
+	--sage: #c2d9ca;
+	--sage-bright: #b8d3c0;
+	--line: rgba(243, 242, 240, 0.14);
+	--line-strong: rgba(243, 242, 240, 0.22);
+	--panel: rgba(243, 242, 240, 0.035);
+	--panel-hover: rgba(243, 242, 240, 0.06);
+
+	/* Статусы (документы INFO) — только текст/точки, не заливки */
+	--status-blue: #8fb0d6;
+	--status-violet: #b9a7dd;
+	--status-green: #93c9a6;
+	--status-amber: #d9b06a;
+	--status-orange: #d98a6a;
+	--status-yellow: #d9c26a;
+
+	/* Типографика */
+	--font-display: 'Cormorant Garamond', Georgia, serif;
+	--font-body: 'Rubik', system-ui, sans-serif;
+	--font-wordmark: 'Unbounded', sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+	/* Форма: волосяная прямая */
+	--radius-hairline: 2px;
+	--radius-card: 3px;
+
+	/* Отступы */
+	--sp-xs: 8px;
+	--sp-sm: 12px;
+	--sp-md: 16px;
+	--sp-lg: 22px;
+	--sp-xl: 28px;
+
+	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+	color-scheme: dark;
+}
+
+/* ---------- База ---------- */
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+	min-height: 100%;
+}
+
+body {
+	background: var(--bg);
+	color: var(--ink);
+	font-family: var(--font-body);
+	font-size: 0.92rem;
+	line-height: 1.6;
+	-webkit-font-smoothing: antialiased;
+	overflow-x: hidden;
+}
+
+h1, h2, h3 {
+	font-family: var(--font-display);
+	font-weight: 400;
+	margin: 0;
+}
+
+a {
+	color: var(--ink);
+	text-decoration: none;
+}
+
+button {
+	font-family: var(--font-body);
+	cursor: pointer;
+}
+
+:focus-visible {
+	outline: 2px solid var(--ink);
+	outline-offset: 3px;
+}
+
+::selection {
+	background: rgba(100, 137, 180, 0.3);
+}
+
+/* ---------- Общие компоненты ---------- */
+
+/* Лейбл-глаз: uppercase микро-подпись */
+.eyebrow {
+	font-family: var(--font-body);
+	font-size: 0.66rem;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--ink-muted);
+}
+
+/* Волосяная карточка (плоская, документный режим) */
+.card {
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: var(--radius-card);
+	padding: clamp(18px, 2.4vw, 26px);
+	transition: border-color 200ms var(--ease-out);
+}
+.card:hover {
+	border-color: var(--line-strong);
+}
+
+/* Текстовая ссылка с волосяным акцентом */
+.text-link {
+	display: inline-block;
+	font-size: 0.72rem;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--ink);
+	padding: 10px 0;
+	border-bottom: 1px solid var(--accent);
+	transition: color 250ms var(--ease-out);
+}
+.text-link:hover {
+	color: #fff;
+}
+
+/* Чип и бейдж */
+.chip {
+	display: inline-block;
+	background: transparent;
+	border: 1px solid var(--line);
+	border-radius: 0;
+	color: var(--ink-muted);
+	font-size: 0.66rem;
+	letter-spacing: 0.06em;
+	padding: 4px 10px;
+}
+.badge {
+	display: inline-block;
+	background: transparent;
+	border: 1px solid var(--line-strong);
+	border-radius: 0;
+	color: var(--ink);
+	font-size: 0.72rem;
+	letter-spacing: 0.08em;
+	padding: 5px 12px;
+}
+
+/* Сериф-подпись */
+.quiet-note {
+	font-family: var(--font-display);
+	font-style: italic;
+	font-size: 1.1rem;
+	color: var(--ink-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}
