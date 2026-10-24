@@ -1,17 +1,18 @@
 <script>
 	/**
 	 * Заглушка графика в стиле nf-diagram/nf-chart (ink-orbit-saas-template).
-	 * Позже заменяется реальными данными: props values → массив чисел.
+	 * Интерактив: crosshair-вертикаль, точка и тултип при наведении (как в оригинале).
+	 * Адаптив: viewBox фиксированный, высота ограничена, координаты указателя — из bbox.
 	 * @type {{values?: number[], title?: string}}
 	 */
 	let { values = [22, 26, 24, 31, 29, 36, 34, 42], title = 'Кривая капитала' } = $props();
 
 	const W = 300;
-	const H = 130;
+	const H = 110;
 	const PAD = 14;
-	const forecastFrom = 6; // индекс, с которого пунктир «FORECAST»
+	const forecastFrom = 6;
 
-	// Пересчёт значений в точки (как zn() в оригинале: сглаживание C-кривыми)
+	// Геометрия (формула zn() из оригинала: C-сглаживание)
 	const geometry = $derived.by(() => {
 		const vals = values.length > 1 ? values : [1, 2];
 		const n = vals.length;
@@ -39,11 +40,51 @@
 	});
 
 	const uid = $props.id();
-	const last = $derived(geometry.pts[geometry.pts.length - 1]);
 	const fcX = $derived(geometry.pts[Math.min(forecastFrom, geometry.pts.length - 1)][0]);
+
+	// --- Интерактивность (как в оригинале: pointermove → ближайшая точка) ---
+	let svgEl = $state(null);
+	let hoverIdx = $state(-1);
+
+	const active = $derived(hoverIdx >= 0 ? geometry.pts[hoverIdx] : geometry.pts[geometry.pts.length - 1]);
+
+	function nearestX(x) {
+		let best = 0;
+		for (let i = 1; i < geometry.pts.length; i++) {
+			if (Math.abs(geometry.pts[i][0] - x) < Math.abs(geometry.pts[best][0] - x)) best = i;
+		}
+		return best;
+	}
+
+	function onMove(e) {
+		if (!svgEl) return;
+		const rect = svgEl.getBoundingClientRect();
+		const x = ((e.clientX - rect.left) / rect.width) * W;
+		hoverIdx = nearestX(x);
+	}
+
+	// Подпись тултипа: дельта от первого значения в %
+	const delta = $derived.by(() => {
+		if (hoverIdx < 0) return '';
+		const v0 = values[0] || 1;
+		const d = Math.round(((values[hoverIdx] - v0) / v0) * 100);
+		return (hoverIdx >= forecastFrom ? 'pred ' : 'pt ' + (hoverIdx + 1) + ' ') + (d >= 0 ? '+' : '') + d + '%';
+	});
+
+	// Тултип не вылезает за края (адаптив)
+	const tipX = $derived(Math.min(W - 40, Math.max(40, active[0])));
+	const tipY = $derived(active[1] < 30 ? active[1] + 22 : active[1] - 12);
 </script>
 
-<svg class="diagram chart" viewBox="0 0 {W} {H + 6}" role="img" aria-label={title}>
+<svg
+	bind:this={svgEl}
+	class="diagram chart"
+	viewBox="0 0 {W} {H + 6}"
+	role="img"
+	aria-label={title}
+	onpointermove={onMove}
+	onpointerleave={() => (hoverIdx = -1)}
+>
 	<defs>
 		<linearGradient id="{uid}-area" x1="0" y1="0" x2="0" y2="1">
 			<stop offset="0" stop-color="var(--ink)" stop-opacity=".12" />
@@ -51,7 +92,6 @@
 		</linearGradient>
 	</defs>
 
-	<!-- Сеточные линии 25/50/75% -->
 	{#each [0.25, 0.5, 0.75] as f}
 		<line x1={PAD} x2={W - PAD} y1={H * f} y2={H * f} stroke="var(--line)" />
 	{/each}
@@ -63,35 +103,38 @@
 	<line x1={fcX} x2={fcX} y1="10" y2={H - PAD} stroke="var(--line-strong)" stroke-dasharray="2 3" />
 	<text x={fcX - 4} y={H - 4} text-anchor="end" font-size="7" fill="var(--ink-muted)" font-family="var(--font-mono)" letter-spacing="1">FORECAST</text>
 
-	<!-- Пульсирующая точка на последнем значении -->
-	{#if last}
-		<circle cx={last[0]} cy={last[1]} r="7" fill="var(--sage)" opacity=".15" class="glow" />
+	<!-- Кроссхейр при наведении -->
+	{#if hoverIdx >= 0}
+		<line x1={active[0]} x2={active[0]} y1="8" y2={H - PAD} stroke="var(--sage)" stroke-opacity=".35" />
 	{/if}
-	{#if last}
-		<circle cx={last[0]} cy={last[1]} r="3.2" fill="var(--bg)" stroke="var(--sage)" stroke-width="1.5" />
+
+	<!-- Точка: активная или покоящаяся с пульсом -->
+	{#if hoverIdx < 0}
+		<circle cx={active[0]} cy={active[1]} r="7" fill="var(--sage)" opacity=".15" class="glow" />
+	{/if}
+	<circle cx={active[0]} cy={active[1]} r="3.2" fill="var(--bg)" stroke="var(--sage)" stroke-width="1.5" />
+
+	<!-- Тултип -->
+	{#if hoverIdx >= 0}
+		<g transform="translate({tipX},{tipY})">
+			<rect x="-32" y="-11" width="64" height="15" rx="2" fill="var(--ink)" />
+			<text x="0" y="-1" text-anchor="middle" font-size="7.5" fill="var(--bg)" font-family="var(--font-mono)">{delta}</text>
+		</g>
 	{/if}
 </svg>
 
 <style>
+	/* Адаптив: ширина 100%, высота ограничена — не тянется вверх на широких панелях */
 	.diagram {
+		display: block;
 		width: 100%;
+		max-height: 180px;
 		height: auto;
 		overflow: visible;
 	}
 	.chart {
 		cursor: crosshair;
-	}
-	.line-draw {
-		stroke-dasharray: 1;
-		stroke-dashoffset: 1;
-		transition: stroke-dashoffset 1.8s cubic-bezier(0.4, 0.1, 0.2, 1);
-	}
-	svg {
-		view-transition-name: none;
-	}
-	svg:hover .line-draw,
-	.panel:hover .line-draw {
-		/* перерисовка при появлении; в Svelte компонент монтируется заново — анимация играется на mount */
+		touch-action: none;
 	}
 	.line-draw {
 		animation: line-in 1.8s cubic-bezier(0.4, 0.1, 0.2, 1) forwards;
@@ -118,6 +161,15 @@
 		50% {
 			opacity: 0.45;
 			transform: scale(1.35);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.line-draw {
+			animation: none;
+			stroke-dashoffset: 0;
+		}
+		.glow {
+			animation: none;
 		}
 	}
 </style>
