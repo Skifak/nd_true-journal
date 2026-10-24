@@ -3,6 +3,7 @@
 	 * Модальная форма сделки: создание и редактирование.
 	 * Без зависимостей. Валидация — доменными функциями.
 	 */
+	import Modal from './Modal.svelte';
 	import {
 		calculateProfit,
 		formatPrice,
@@ -71,8 +72,7 @@
 
 	const contract = $derived(form ? getContractSize(form.pair, form.contractSize === '' ? null : form.contractSize) : 0);
 
-	function submit(e) {
-		e.preventDefault();
+	function submit() {
 		if (!form.pair) {
 			errorMsg = 'Укажите инструмент';
 			return;
@@ -113,207 +113,125 @@
 	}
 </script>
 
-{#if open && form}
-	<div
-		class="overlay"
-		role="presentation"
-		onclick={(e) => {
-			if (e.target === e.currentTarget) close();
-		}}
-	>
-		<form class="dialog" onsubmit={submit}>
-			<header class="dialog-head">
-				<h2>{isNew ? 'Новая сделка' : 'Сделка'}</h2>
-				<button type="button" class="x" onclick={close} aria-label="Закрыть">✕</button>
-			</header>
+{#if form}
+	<Modal bind:open title={isNew ? 'Новая сделка' : 'Сделка'} size="md" {onClose}>
+		<div class="grid">
+			<label class="f">
+				<span>Инструмент</span>
+				<input list="pairs" bind:value={form.pair} placeholder="EURUSD" required />
+				<datalist id="pairs">
+					{#each PAIRS as p (p)}<option value={p}></option>{/each}
+				</datalist>
+			</label>
 
-			<div class="grid">
+			<label class="f">
+				<span>Направление</span>
+				<select bind:value={form.direction}>
+					<option value="long">LONG</option>
+					<option value="short">SHORT</option>
+				</select>
+			</label>
+
+			<label class="f">
+				<span>Объём (лот)</span>
+				<input type="number" step="0.01" min="0.01" bind:value={form.volume} required />
+			</label>
+
+			<label class="f">
+				<span>Цена открытия</span>
+				<input type="number" step="any" bind:value={form.priceOpen} required />
+			</label>
+
+			<label class="f">
+				<span>Время открытия</span>
+				<input type="text" bind:value={form.dateOpen} placeholder="YYYY-MM-DD HH:mm:ss" />
+			</label>
+
+			<label class="f">
+				<span>Статус</span>
+				<select bind:value={form.status}>
+					<option value="open">Открыта</option>
+					<option value="closed">Закрыта</option>
+				</select>
+			</label>
+
+			<label class="f">
+				<span>SL</span>
+				<input type="number" step="any" bind:value={form.sl} placeholder="—" />
+			</label>
+
+			<label class="f">
+				<span>TP</span>
+				<input type="number" step="any" bind:value={form.tp} placeholder="—" />
+			</label>
+
+			{#if form.status === 'closed'}
 				<label class="f">
-					<span>Инструмент</span>
-					<input list="pairs" bind:value={form.pair} placeholder="EURUSD" required />
-					<datalist id="pairs">
-						{#each PAIRS as p (p)}<option value={p}></option>{/each}
-					</datalist>
+					<span>Цена закрытия</span>
+					<input type="number" step="any" bind:value={form.priceClose} required />
 				</label>
-
 				<label class="f">
-					<span>Направление</span>
-					<select bind:value={form.direction}>
-						<option value="long">LONG</option>
-						<option value="short">SHORT</option>
-					</select>
+					<span>Время закрытия</span>
+					<input type="text" bind:value={form.dateClose} placeholder="YYYY-MM-DD HH:mm:ss" />
 				</label>
-
-				<label class="f">
-					<span>Объём (лот)</span>
-					<input type="number" step="0.01" min="0.01" bind:value={form.volume} required />
-				</label>
-
-				<label class="f">
-					<span>Цена открытия</span>
-					<input type="number" step="any" bind:value={form.priceOpen} required />
-				</label>
-
-				<label class="f">
-					<span>Время открытия</span>
-					<input type="text" bind:value={form.dateOpen} placeholder="YYYY-MM-DD HH:mm:ss" />
-				</label>
-
-				<label class="f">
-					<span>Статус</span>
-					<select bind:value={form.status}>
-						<option value="open">Открыта</option>
-						<option value="closed">Закрыта</option>
-					</select>
-				</label>
-
-				<label class="f">
-					<span>SL</span>
-					<input type="number" step="any" bind:value={form.sl} placeholder="—" />
-				</label>
-
-				<label class="f">
-					<span>TP</span>
-					<input type="number" step="any" bind:value={form.tp} placeholder="—" />
-				</label>
-
-				{#if form.status === 'closed'}
-					<label class="f">
-						<span>Цена закрытия</span>
-						<input type="number" step="any" bind:value={form.priceClose} required />
-					</label>
-					<label class="f">
-						<span>Время закрытия</span>
-						<input type="text" bind:value={form.dateClose} placeholder="YYYY-MM-DD HH:mm:ss" />
-					</label>
-				{/if}
-
-				<label class="f">
-					<span>Комиссия</span>
-					<input type="number" step="any" bind:value={form.commission} />
-				</label>
-
-				<label class="f">
-					<span>Своп</span>
-					<input type="number" step="any" bind:value={form.swap} />
-				</label>
-
-				<label class="f">
-					<span>Контракт-сайз</span>
-					<input type="number" step="any" bind:value={form.contractSize} placeholder={`${contract}`} />
-				</label>
-
-				<label class="f wide">
-					<span>Комментарий</span>
-					<textarea rows="2" bind:value={form.comment} placeholder="Сетап, контекст, ошибки…"></textarea>
-				</label>
-			</div>
-
-			<div class="preview">
-				{#if preview != null}
-					<span class="pv-label">Расчётный P/L</span>
-					<span class="pv-value" class:profit={preview >= 0} class:loss={preview < 0}>
-						{preview.toFixed(2)} {currency}
-					</span>
-				{:else}
-					<span class="pv-label">Контракт</span>
-					<span class="pv-value muted">{contract.toLocaleString('ru-RU')} ед.</span>
-				{/if}
-			</div>
-
-			{#if errorMsg}
-				<p class="err">{errorMsg}</p>
 			{/if}
 
-			<footer class="dialog-foot">
-				{#if !isNew}
-					<button
-						type="button"
-						class="btn danger"
-						onclick={() => {
-							onDelete(form);
-							open = false;
-						}}>Удалить</button
-					>
-				{/if}
-				<div class="spacer"></div>
-				<button type="button" class="btn" onclick={close}>Отмена</button>
-				<button type="submit" class="btn primary">{isNew ? 'Создать' : 'Сохранить'}</button>
-			</footer>
-		</form>
-	</div>
+			<label class="f">
+				<span>Комиссия</span>
+				<input type="number" step="any" bind:value={form.commission} />
+			</label>
+
+			<label class="f">
+				<span>Своп</span>
+				<input type="number" step="any" bind:value={form.swap} />
+			</label>
+
+			<label class="f">
+				<span>Контракт-сайз</span>
+				<input type="number" step="any" bind:value={form.contractSize} placeholder={`${contract}`} />
+			</label>
+
+			<label class="f wide">
+				<span>Комментарий</span>
+				<textarea rows="2" bind:value={form.comment} placeholder="Сетап, контекст, ошибки…"></textarea>
+			</label>
+		</div>
+
+		<div class="preview">
+			{#if preview != null}
+				<span class="pv-label">Расчётный P/L</span>
+				<span class="pv-value" class:profit={preview >= 0} class:loss={preview < 0}>
+					{preview.toFixed(2)} {currency}
+				</span>
+			{:else}
+				<span class="pv-label">Контракт</span>
+				<span class="pv-value muted">{contract.toLocaleString('ru-RU')} ед.</span>
+			{/if}
+		</div>
+
+		{#if errorMsg}
+			<p class="err">{errorMsg}</p>
+		{/if}
+
+		{#snippet footer()}
+			{#if !isNew}
+				<button
+					type="button"
+					class="btn danger"
+					onclick={() => {
+						onDelete(form);
+						open = false;
+					}}>Удалить</button
+				>
+			{/if}
+			<div class="spacer"></div>
+			<button type="button" class="btn" onclick={close}>Отмена</button>
+			<button type="button" class="btn primary" onclick={submit}>{isNew ? 'Создать' : 'Сохранить'}</button>
+		{/snippet}
+	</Modal>
 {/if}
 
 <style>
-	/* Плоский документ: непрозрачная подложка, без blur и стекла */
-	.overlay {
-		position: fixed;
-		inset: 0;
-		z-index: 60;
-		background: var(--scrim);
-		display: grid;
-		place-items: center;
-		padding: 1.5rem;
-		animation: fade-in 0.16s ease-out;
-	}
-	@keyframes fade-in {
-		from {
-			opacity: 0;
-		}
-	}
-	.dialog {
-		position: relative;
-		width: min(720px, 100%);
-		max-height: 88dvh;
-		overflow: auto;
-		background: var(--panel-solid);
-		border: 1px solid var(--line-strong);
-		border-radius: 2px;
-		padding: 1.1rem 1.2rem 1rem;
-		box-shadow: 0 0 0 1px var(--bg), 0 18px 48px -24px #000;
-	}
-	/* Угловые марки — тот же язык, что frame-hover на панелях */
-	.dialog::before,
-	.dialog::after {
-		content: '';
-		position: absolute;
-		width: 12px;
-		height: 12px;
-		border: 0 solid var(--line-strong);
-		pointer-events: none;
-	}
-	.dialog::before {
-		top: -1px;
-		left: -1px;
-		border-top-width: 1.5px;
-		border-left-width: 1.5px;
-	}
-	.dialog::after {
-		bottom: -1px;
-		right: -1px;
-		border-bottom-width: 1.5px;
-		border-right-width: 1.5px;
-	}
-	.dialog-head {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		margin-bottom: 0.9rem;
-	}
-	.dialog-head h2 {
-		font-size: 1.4rem;
-		letter-spacing: -0.02em;
-	}
-	.x {
-		background: transparent;
-		border: none;
-		color: var(--ink-muted);
-		cursor: pointer;
-		font-size: 0.9rem;
-	}
-	.x:hover {
-		color: var(--ink);
-	}
 	.grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -387,14 +305,6 @@
 		font-family: var(--font-mono);
 		font-size: 0.68rem;
 		color: var(--danger, #c98a8a);
-	}
-	.dialog-foot {
-		display: flex;
-		gap: 0.5rem;
-		align-items: center;
-		margin-top: 1rem;
-		padding-top: 0.8rem;
-		border-top: 1px solid var(--line);
 	}
 	.spacer {
 		flex: 1;

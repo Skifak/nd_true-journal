@@ -3,6 +3,7 @@
 	 * Импорт отчёта MetaTrader 5: выбор файла → разбор → предпросмотр → добавление.
 	 * Разбор полностью локальный, файл никуда не отправляется.
 	 */
+	import Modal from './Modal.svelte';
 	import { parseMt5Report } from '#lib/domain/mt5.js';
 	import { formatDate, formatMoney, tradeProfit } from '#lib/domain/trades.js';
 
@@ -77,173 +78,101 @@
 </script>
 
 {#if open}
-	<div
-		class="overlay"
-		role="presentation"
-		onclick={(e) => {
-			if (e.target === e.currentTarget) close();
-		}}
-	>
-		<div class="dialog">
-			<header class="dialog-head">
-				<h2>Импорт MT5</h2>
-				<button type="button" class="x" onclick={close} aria-label="Закрыть">✕</button>
-			</header>
-
-			{#if !result}
-				<label
-					class="dropzone"
-					class:over={dragOver}
-					ondragover={(e) => {
-						e.preventDefault();
-						dragOver = true;
-					}}
-					ondragleave={() => (dragOver = false)}
-					ondrop={onDrop}
+	<Modal bind:open title="Импорт MT5" subtitle="отчёт торговой истории MT5 · данные не покидают устройство" size="md" {onClose}>
+		{#if !result}
+			<label
+				class="dropzone"
+				class:over={dragOver}
+				ondragover={(e) => {
+					e.preventDefault();
+					dragOver = true;
+				}}
+				ondragleave={() => (dragOver = false)}
+				ondrop={onDrop}
+			>
+				<input type="file" accept=".html,.htm,text/html" onchange={onPick} hidden />
+				<span class="dz-icon">⤓</span>
+				<span class="dz-title">{busy ? 'Разбираю…' : 'Перетащите HTML-отчёт MT5'}</span>
+				<span class="dz-hint">или нажмите, чтобы выбрать файл</span>
+			</label>
+		{:else}
+			<div class="file-line">
+				<span class="file-name">{fileName}</span>
+				<span class="tag"
+					>{result.reportType === 'history'
+						? 'история'
+						: result.reportType === 'trade'
+							? 'торговый отчёт'
+							: 'неизвестно'}</span
 				>
-					<input type="file" accept=".html,.htm,text/html" onchange={onPick} hidden />
-					<span class="dz-icon">⤓</span>
-					<span class="dz-title">{busy ? 'Разбираю…' : 'Перетащите HTML-отчёт MT5'}</span>
-					<span class="dz-hint">или нажмите, чтобы выбрать файл · данные не покидают устройство</span>
-				</label>
-			{:else}
-				<div class="file-line">
-					<span class="file-name">{fileName}</span>
-					<span class="tag">{result.reportType === 'history' ? 'история' : result.reportType === 'trade' ? 'торговый отчёт' : 'неизвестно'}</span>
+			</div>
+
+			{#if closedStats}
+				<div class="stats">
+					<span>Извлечено <b>{closedStats.count}</b></span>
+					<span>закрытых <b>{closedStats.closed}</b></span>
+					<span>побед <b class="profit">{closedStats.wins}</b></span>
+					<span
+						>P/L <b class:profit={closedStats.profit >= 0} class:loss={closedStats.profit < 0}
+							>{formatMoney(closedStats.profit, currency, true)}</b
+						></span
+					>
 				</div>
+			{/if}
 
-				{#if closedStats}
-					<div class="stats">
-						<span>Извлечено <b>{closedStats.count}</b></span>
-						<span>закрытых <b>{closedStats.closed}</b></span>
-						<span>побед <b class="profit">{closedStats.wins}</b></span>
-						<span>P/L <b class:profit={closedStats.profit >= 0} class:loss={closedStats.profit < 0}
-								>{formatMoney(closedStats.profit, currency, true)}</b
-							></span>
-					</div>
-				{/if}
-
-				<div class="preview-wrap">
-					<table class="preview">
-						<thead>
+			<div class="preview-wrap">
+				<table class="preview">
+					<thead>
+						<tr>
+							<th>Открыта</th>
+							<th>Пара</th>
+							<th>Напр.</th>
+							<th class="num">Объём</th>
+							<th class="num">P/L</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each result.trades.slice(0, 12) as t (t.id)}
+							{@const pl = tradeProfit(t)}
 							<tr>
-								<th>Открыта</th>
-								<th>Пара</th>
-								<th>Напр.</th>
-								<th class="num">Объём</th>
-								<th class="num">P/L</th>
+								<td class="mono">{formatDate(t.dateOpen)}</td>
+								<td>{t.pair}</td>
+								<td class="mono">{t.direction === 'long' ? 'L' : 'S'}</td>
+								<td class="num mono">{t.volume}</td>
+								<td class="num mono" class:profit={pl >= 0} class:loss={pl < 0}
+									>{formatMoney(pl, currency, true)}</td
+								>
 							</tr>
-						</thead>
-						<tbody>
-							{#each result.trades.slice(0, 12) as t (t.id)}
-								{@const pl = tradeProfit(t)}
-								<tr>
-									<td class="mono">{formatDate(t.dateOpen)}</td>
-									<td>{t.pair}</td>
-									<td class="mono">{t.direction === 'long' ? 'L' : 'S'}</td>
-									<td class="num mono">{t.volume}</td>
-									<td class="num mono" class:profit={pl >= 0} class:loss={pl < 0}
-										>{formatMoney(pl, currency, true)}</td
-									>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-					{#if result.trades.length > 12}
-						<p class="more">…и ещё {result.trades.length - 12}</p>
-					{/if}
-				</div>
-			{/if}
-
-			{#if errMsg}
-				<p class="err">{errMsg}</p>
-			{/if}
-
-			<footer class="dialog-foot">
-				{#if result}
-					<button type="button" class="btn" onclick={() => (result = null)}>Другой файл</button>
+						{/each}
+					</tbody>
+				</table>
+				{#if result.trades.length > 12}
+					<p class="more">…и ещё {result.trades.length - 12}</p>
 				{/if}
-				<div class="spacer"></div>
-				<button type="button" class="btn" onclick={close}>Отмена</button>
-				<button
-					type="button"
-					class="btn primary"
-					disabled={!result?.trades?.length}
-					onclick={confirmImport}>Импортировать</button
-				>
-			</footer>
-		</div>
-	</div>
+			</div>
+		{/if}
+
+		{#if errMsg}
+			<p class="err">{errMsg}</p>
+		{/if}
+
+		{#snippet footer()}
+			{#if result}
+				<button type="button" class="btn" onclick={() => (result = null)}>Другой файл</button>
+			{/if}
+			<div class="spacer"></div>
+			<button type="button" class="btn" onclick={close}>Отмена</button>
+			<button
+				type="button"
+				class="btn primary"
+				disabled={!result?.trades?.length}
+				onclick={confirmImport}>Импортировать</button
+			>
+		{/snippet}
+	</Modal>
 {/if}
 
 <style>
-	/* Плоский документ: непрозрачная подложка, без blur и стекла */
-	.overlay {
-		position: fixed;
-		inset: 0;
-		z-index: 60;
-		background: var(--scrim);
-		display: grid;
-		place-items: center;
-		padding: 1.5rem;
-		animation: fade-in 0.16s ease-out;
-	}
-	@keyframes fade-in {
-		from {
-			opacity: 0;
-		}
-	}
-	.dialog {
-		position: relative;
-		width: min(680px, 100%);
-		max-height: 88dvh;
-		overflow: auto;
-		background: var(--panel-solid);
-		border: 1px solid var(--line-strong);
-		border-radius: 2px;
-		padding: 1.1rem 1.2rem 1rem;
-		box-shadow: 0 0 0 1px var(--bg), 0 18px 48px -24px #000;
-	}
-	.dialog::before,
-	.dialog::after {
-		content: '';
-		position: absolute;
-		width: 12px;
-		height: 12px;
-		border: 0 solid var(--line-strong);
-		pointer-events: none;
-	}
-	.dialog::before {
-		top: -1px;
-		left: -1px;
-		border-top-width: 1.5px;
-		border-left-width: 1.5px;
-	}
-	.dialog::after {
-		bottom: -1px;
-		right: -1px;
-		border-bottom-width: 1.5px;
-		border-right-width: 1.5px;
-	}
-	.dialog-head {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		margin-bottom: 0.9rem;
-	}
-	.dialog-head h2 {
-		font-size: 1.4rem;
-		letter-spacing: -0.02em;
-	}
-	.x {
-		background: transparent;
-		border: none;
-		color: var(--ink-muted);
-		cursor: pointer;
-	}
-	.x:hover {
-		color: var(--ink);
-	}
 	.dropzone {
 		display: flex;
 		flex-direction: column;
@@ -363,14 +292,6 @@
 		font-family: var(--font-mono);
 		font-size: 0.68rem;
 		color: var(--danger, #c98a8a);
-	}
-	.dialog-foot {
-		display: flex;
-		gap: 0.5rem;
-		align-items: center;
-		margin-top: 1rem;
-		padding-top: 0.8rem;
-		border-top: 1px solid var(--line);
 	}
 	.spacer {
 		flex: 1;

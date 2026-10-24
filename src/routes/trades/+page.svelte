@@ -7,6 +7,7 @@
 	import TradesTable from '#lib/components/TradesTable.svelte';
 	import TradeDialog from '#lib/components/TradeDialog.svelte';
 	import Mt5ImportDialog from '#lib/components/Mt5ImportDialog.svelte';
+	import Modal from '#lib/components/Modal.svelte';
 	import {
 		emptyFilters,
 		filterTrades,
@@ -180,24 +181,16 @@
 
 <Mt5ImportDialog bind:open={importOpen} onImport={handleImport} onClose={onImportClose} />
 
-{#if confirmWipe}
-	<div
-		class="overlay"
-		role="presentation"
-		onclick={(e) => {
-			if (e.target === e.currentTarget) confirmWipe = false;
-		}}
-	>
-		<div class="confirm">
-			<h3>Удалить все сделки?</h3>
-			<p>Будет удалено {all.length} записей. Действие нельзя отменить.</p>
-			<div class="confirm-foot">
-				<button class="btn" onclick={() => (confirmWipe = false)}>Отмена</button>
-				<button class="btn danger" onclick={wipeAll}>Удалить</button>
-			</div>
-		</div>
-	</div>
-{/if}
+<Modal bind:open={confirmWipe} title="Удалить все сделки?" size="sm">
+	<p class="confirm-text">
+		Будет удалено {all.length} записей. Действие нельзя отменить — данные хранятся локально, копии нет.
+	</p>
+	{#snippet footer()}
+		<div class="spacer"></div>
+		<button class="btn" onclick={() => (confirmWipe = false)}>Отмена</button>
+		<button class="btn danger" onclick={wipeAll}>Удалить</button>
+	{/snippet}
+</Modal>
 
 <style>
 	.page {
@@ -254,41 +247,13 @@
 		font-size: 0.68rem;
 		color: var(--ink);
 	}
-	.overlay {
-		position: fixed;
-		inset: 0;
-		z-index: 65;
-		background: var(--scrim);
-		display: grid;
-		place-items: center;
-		animation: fade-in 0.16s ease-out;
-	}
-	@keyframes fade-in {
-		from {
-			opacity: 0;
-		}
-	}
-	.confirm {
-		width: min(400px, 92vw);
-		padding: 1.2rem;
-		background: var(--panel-solid);
-		border: 1px solid var(--line-strong);
-		border-radius: 2px;
-		box-shadow: 0 0 0 1px var(--bg), 0 18px 48px -24px #000;
-	}
-	.confirm h3 {
-		font-size: 1.2rem;
-		margin-bottom: 0.5rem;
-	}
-	.confirm p {
-		font-size: 0.82rem;
+	.confirm-text {
+		font-size: 0.86rem;
+		line-height: 1.5;
 		color: var(--ink-muted);
-		margin-bottom: 1rem;
 	}
-	.confirm-foot {
-		display: flex;
-		gap: 0.5rem;
-		justify-content: flex-end;
+	.spacer {
+		flex: 1;
 	}
 	.btn {
 		font-family: var(--font-mono);
