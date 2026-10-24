@@ -489,9 +489,10 @@
 		z-index: 41;
 		min-width: 190px;
 		padding: 0.3rem;
-		background: var(--panel);
+		background: var(--panel-solid-raised);
 		border: 1px solid var(--line-strong);
-		border-radius: 3px;
+		border-radius: 2px;
+		box-shadow: 0 12px 30px -18px #000;
 		display: flex;
 		flex-direction: column;
 		gap: 1px;

@@ -75,6 +75,13 @@
 	--panel: rgba(243, 242, 240, 0.035);
 	--panel-hover: rgba(243, 242, 240, 0.06);
 
+	/* Модалки: плоский документ, без стекла и blur.
+	   Подложка непрозрачная, поверх неё — panel-solid с hairline-рамкой. */
+	--scrim: #0f1112;
+	--panel-solid: #1c1e20;
+	--panel-solid-raised: #212426;
+	--danger: #c98a8a;
+
 	/* Статусы (документы INFO) — только текст/точки, не заливки */
 	--status-blue: #8fb0d6;
 	--status-violet: #b9a7dd;

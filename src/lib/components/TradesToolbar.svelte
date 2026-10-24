@@ -280,9 +280,10 @@
 		z-index: 30;
 		min-width: 180px;
 		padding: 0.5rem;
-		background: var(--panel);
+		background: var(--panel-solid-raised);
 		border: 1px solid var(--line-strong);
-		border-radius: 3px;
+		border-radius: 2px;
+		box-shadow: 0 12px 30px -18px #000;
 	}
 	.cols-title {
 		font-family: var(--font-mono);

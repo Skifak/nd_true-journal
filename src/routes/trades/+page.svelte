@@ -246,9 +246,10 @@
 		transform: translateX(-50%);
 		z-index: 70;
 		padding: 0.5rem 1rem;
-		background: var(--panel);
+		background: var(--panel-solid-raised);
 		border: 1px solid var(--line-strong);
 		border-radius: 2px;
+		box-shadow: 0 10px 28px -16px #000;
 		font-family: var(--font-mono);
 		font-size: 0.68rem;
 		color: var(--ink);
@@ -257,16 +258,23 @@
 		position: fixed;
 		inset: 0;
 		z-index: 65;
-		background: rgba(10, 11, 12, 0.72);
+		background: var(--scrim);
 		display: grid;
 		place-items: center;
+		animation: fade-in 0.16s ease-out;
+	}
+	@keyframes fade-in {
+		from {
+			opacity: 0;
+		}
 	}
 	.confirm {
 		width: min(400px, 92vw);
 		padding: 1.2rem;
-		background: var(--panel);
+		background: var(--panel-solid);
 		border: 1px solid var(--line-strong);
-		border-radius: 3px;
+		border-radius: 2px;
+		box-shadow: 0 0 0 1px var(--bg), 0 18px 48px -24px #000;
 	}
 	.confirm h3 {
 		font-size: 1.2rem;

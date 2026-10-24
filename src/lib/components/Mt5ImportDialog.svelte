@@ -177,23 +177,53 @@
 {/if}
 
 <style>
+	/* Плоский документ: непрозрачная подложка, без blur и стекла */
 	.overlay {
 		position: fixed;
 		inset: 0;
 		z-index: 60;
-		background: rgba(10, 11, 12, 0.72);
+		background: var(--scrim);
 		display: grid;
 		place-items: center;
 		padding: 1.5rem;
+		animation: fade-in 0.16s ease-out;
+	}
+	@keyframes fade-in {
+		from {
+			opacity: 0;
+		}
 	}
 	.dialog {
+		position: relative;
 		width: min(680px, 100%);
 		max-height: 88dvh;
 		overflow: auto;
-		background: var(--panel);
+		background: var(--panel-solid);
 		border: 1px solid var(--line-strong);
-		border-radius: 3px;
+		border-radius: 2px;
 		padding: 1.1rem 1.2rem 1rem;
+		box-shadow: 0 0 0 1px var(--bg), 0 18px 48px -24px #000;
+	}
+	.dialog::before,
+	.dialog::after {
+		content: '';
+		position: absolute;
+		width: 12px;
+		height: 12px;
+		border: 0 solid var(--line-strong);
+		pointer-events: none;
+	}
+	.dialog::before {
+		top: -1px;
+		left: -1px;
+		border-top-width: 1.5px;
+		border-left-width: 1.5px;
+	}
+	.dialog::after {
+		bottom: -1px;
+		right: -1px;
+		border-bottom-width: 1.5px;
+		border-right-width: 1.5px;
 	}
 	.dialog-head {
 		display: flex;
@@ -299,10 +329,10 @@
 		text-transform: uppercase;
 		color: var(--ink-muted);
 		padding: 0.35rem 0.4rem;
-		border-bottom: 1px solid var(--line);
+		border-bottom: 1px solid var(--line-strong);
 		position: sticky;
 		top: 0;
-		background: var(--panel);
+		background: var(--panel-solid);
 	}
 	table.preview td {
 		padding: 0.32rem 0.4rem;
