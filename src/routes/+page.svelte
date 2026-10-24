@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { detectPlatform, isTauri } from '#lib/platform/index.ts';
+	import { aiState } from '#lib/ai/store.svelte.ts';
 	import { namespaced } from '#lib/storage/local.ts';
 	import { getTrades, initJournal, journalState } from '#lib/storage/journalStore.svelte.ts';
 	import { equityCurve } from '#lib/domain/journal.ts';
@@ -205,8 +206,12 @@
 			<span class="eyebrow">безопасность</span>
 		</div>
 		<ul class="status-list">
-			<li><span class="dot ok"></span>Сетевых вызовов нет</li>
-			<li><span class="dot ok"></span>Данные не покидают устройство</li>
+			<li><span class="dot ok"></span>Журнал: сетевых вызовов нет</li>
+			{#if aiState.keyReady}
+				<li><span class="dot warn"></span>AI: прямые запросы к поставщику, без прокси</li>
+			{:else}
+				<li><span class="dot ok"></span>Данные не покидают устройство</li>
+			{/if}
 			<li><span class="dot ok"></span>Файлы — только в песочнице приложения</li>
 			<li><span class="dot"></span>Платформа: {platform}{isTauri() ? ' (нативная оболочка)' : ''}</li>
 		</ul>
@@ -421,6 +426,9 @@
 	}
 	.dot.ok {
 		background: var(--status-green);
+	}
+	.dot.warn {
+		background: var(--status-amber);
 	}
 
 	@media (max-width: 900px) {

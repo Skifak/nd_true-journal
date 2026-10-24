@@ -7,7 +7,9 @@
 
 	const nav = [
 		{ idx: '01', label: 'Дашборд', path: '/' },
-		{ idx: '02', label: 'Все сделки', path: '/trades' }
+		{ idx: '02', label: 'Все сделки', path: '/trades' },
+		{ idx: '03', label: 'AI', path: '/ai' },
+		{ idx: '04', label: 'Настройки', path: '/settings' }
 	];
 
 	const current = $derived(nav.find((n) => n.path === page.url.pathname) ?? nav[0]);
@@ -40,17 +42,7 @@
 		<nav>
 			{#each nav as item (item.path)}
 				<a class="nav-item" class:active={item.path === current.path} href={item.path} title={item.label}>
-					{#if item.path === '/'}
-						<svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
-							<path d="M2.5 10.5 8 5l3.5 3.5L17 3M17 3v5M17 3h-5" />
-							<path d="M2.5 17h15" />
-						</svg>
-					{:else}
-						<svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
-							<rect x="2.5" y="3.5" width="15" height="13" />
-							<path d="M2.5 7.5h15M7.5 7.5v9" />
-						</svg>
-					{/if}
+					{@render ico(item.path, 'nav-ico')}
 					<span class="nav-label">{item.label}</span>
 					<span class="nav-idx">{item.idx}</span>
 				</a>
@@ -84,21 +76,30 @@
 			href={item.path}
 			aria-current={item.path === current.path ? 'page' : undefined}
 		>
-			{#if item.path === '/'}
-				<svg viewBox="0 0 20 20" aria-hidden="true">
-					<path d="M2.5 10.5 8 5l3.5 3.5L17 3M17 3v5M17 3h-5" />
-					<path d="M2.5 17h15" />
-				</svg>
-			{:else}
-				<svg viewBox="0 0 20 20" aria-hidden="true">
-					<rect x="2.5" y="3.5" width="15" height="13" />
-					<path d="M2.5 7.5h15M7.5 7.5v9" />
-				</svg>
-			{/if}
+			{@render ico(item.path)}
 			<span>{item.label}</span>
 		</a>
 	{/each}
 </nav>
+
+<!-- Иконки разделов: line-иконки в стиле сайта (hairline, stroke 1.2) -->
+{#snippet ico(path: string, cls: string = '')}
+	<svg class={cls} viewBox="0 0 20 20" aria-hidden="true">
+		{#if path === '/'}
+			<path d="M2.5 10.5 8 5l3.5 3.5L17 3M17 3v5M17 3h-5" />
+			<path d="M2.5 17h15" />
+		{:else if path === '/trades'}
+			<rect x="2.5" y="3.5" width="15" height="13" />
+			<path d="M2.5 7.5h15M7.5 7.5v9" />
+		{:else if path === '/ai'}
+			<path d="M10 2.5v3M10 14.5v3M2.5 10h3M14.5 10h3M4.7 4.7l2.1 2.1M13.2 13.2l2.1 2.1M15.3 4.7l-2.1 2.1M6.8 13.2l-2.1 2.1" />
+			<circle cx="10" cy="10" r="2.6" />
+		{:else}
+			<circle cx="10" cy="10" r="2.6" />
+			<path d="M10 2.5v1.8M10 15.7v1.8M2.5 10h1.8M15.7 10h1.8M4.7 4.7l1.3 1.3M14 14l1.3 1.3M15.3 4.7 14 6M6 14l-1.3 1.3" />
+		{/if}
+	</svg>
+{/snippet}
 
 <style>
 	.shell {
