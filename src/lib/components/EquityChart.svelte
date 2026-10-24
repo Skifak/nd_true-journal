@@ -18,6 +18,9 @@
 	const padL = 42;
 	const padR = 16;
 
+	// Индекс, с которого начинается пунктир «FORECAST» (по умолчанию — 75% точек)
+	const forecastFrom = $derived(Math.max(1, Math.round(values.length * 0.75)));
+
 	// Реальная ширина контейнера → пиксельный viewBox (без леттербокса)
 	let cw = $state(0);
 	const W = $derived(Math.max(340, Math.round(cw) || 720));
