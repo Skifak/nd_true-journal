@@ -2,6 +2,12 @@
 	/**
 	 * Модальная форма сделки: создание и редактирование.
 	 * Без зависимостей. Валидация — доменными функциями.
+	 *
+	 * Перенято из формы старого журнала (components/trade-form):
+	 *  - «Текущее время» / ручной ввод даты (datetime-local)
+	 *  - R:R-пресеты (1:1…1:5) — TP считается из входа и SL
+	 *  - Расчёт риска (|entry − SL| × контракт × объём) и R:R live
+	 *  - Подтверждение при закрытии формы с несохранёнными данными
 	 */
 	import Modal from './Modal.svelte';
 	import {
@@ -30,8 +36,16 @@
 		onClose = () => {}
 	} = $props();
 
-	let form = $state(null);
+	let form = $state(/** @type {any} */ (null));
 	let errorMsg = $state('');
+
+	// «Текущее время» из старого журнала: чекбокс вместо ручного ввода
+	let useCurrentTime = $state(true);
+	/** datetime-local работает с 'YYYY-MM-DDTHH:mm', журнал хранит ' ' — конвертация туда-обратно */
+	/** @param {string|null} stamp */
+	const toLocalInput = (stamp) => (stamp ? String(stamp).replace(' ', 'T').slice(0, 16) : '');
+	/** @param {string|null} v */
+	const fromLocalInput = (v) => (v ? String(v).replace('T', ' ') : '');
 
 	// Пересоздаём форму при открытии/смене сделки
 	$effect(() => {
@@ -55,6 +69,7 @@
 					contractSize: '',
 					comment: ''
 				};
+		useCurrentTime = !trade?.dateOpenManual;
 		errorMsg = '';
 	});
 
@@ -71,6 +86,72 @@
 	});
 
 	const contract = $derived(form ? getContractSize(form.pair, form.contractSize === '' ? null : form.contractSize) : 0);
+
+	// ── Риск и R:R (механика TradeFormRiskPanel старого журнала) ──
+	const RR_PRESETS = [
+		{ label: '1:1', ratio: 1 },
+		{ label: '1:2', ratio: 2 },
+		{ label: '1:3', ratio: 3 },
+		{ label: '1:5', ratio: 5 }
+	];
+
+	const riskInfo = $derived.by(() => {
+		if (!form) return { amount: null, rr: null };
+		const entry = Number(form.priceOpen);
+		const sl = Number(form.sl);
+		const tp = Number(form.tp);
+		const units = getContractSize(form.pair, form.contractSize === '' ? null : form.contractSize) * (Number(form.volume) || 0);
+		/** @type {number|null} */ const amount = sl > 0 && entry > 0 ? Math.abs(entry - sl) * units : null;
+		/** @type {number|null} */ const reward = tp > 0 && entry > 0 ? Math.abs(tp - entry) * units : null;
+		const rr = amount != null && reward != null && amount > 0 ? reward / amount : null;
+		return { amount, rr };
+	});
+	const canApplyRr = $derived(Number(form?.priceOpen) > 0 && Number(form?.sl) > 0 && Number(form.priceOpen) !== Number(form.sl));
+
+	/** @param {number} ratio */
+	function applyRr(ratio) {
+		const entry = Number(form.priceOpen);
+		const sl = Number(form.sl);
+		if (!entry || !sl || entry === sl) return;
+		const dist = Math.abs(entry - sl);
+		const isLong = form.direction === 'long';
+		const tp = isLong ? entry + dist * ratio : entry - dist * ratio;
+		const decimals = String(form.priceOpen).split('.')[1]?.length || 5;
+		form = { ...form, tp: Number(tp.toFixed(decimals)) };
+	}
+
+	/** Есть ли несохранённые изменения (для подтверждения закрытия) */
+	const dirty = $derived.by(() => {
+		if (!form) return false;
+		if (errorMsg) return true;
+		if (trade) {
+			return ['pair', 'direction', 'volume', 'priceOpen', 'sl', 'tp', 'comment'].some(
+				(k) => String(form[k] ?? '') !== String(trade[k] ?? '')
+			);
+		}
+		// Новая сделка: осмысленно хоть что-то заполнено сверх дефолта
+		return (
+			String(form.pair).toUpperCase() !== 'EURUSD' ||
+			String(form.priceOpen ?? '') !== '' ||
+			String(form.sl ?? '') !== '' ||
+			String(form.tp ?? '') !== '' ||
+			String(form.comment ?? '').trim() !== ''
+		);
+	});
+
+	// Подтверждение перед потерей введённых данных
+	let confirmDiscard = $state(false);
+	function requestClose() {
+		if (dirty) {
+			confirmDiscard = true;
+			return;
+		}
+		close();
+	}
+	function discardAndClose() {
+		confirmDiscard = false;
+		close();
+	}
 
 	function submit() {
 		if (!form.pair) {
@@ -89,16 +170,30 @@
 			errorMsg = 'Для закрытой сделки нужна цена закрытия';
 			return;
 		}
+		// Валидация дат: журнал и сортировка ломаются от опечаток в формате
+		const stampRe = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/;
+		const dateOpenFinal = useCurrentTime && isNew ? nowStamp() : fromLocalInput(form.dateOpen);
+		if (dateOpenFinal && !stampRe.test(dateOpenFinal)) {
+			errorMsg = 'Дата открытия: формат ГГГГ-ММ-ДД ЧЧ:ММ';
+			return;
+		}
+		let dateCloseFinal = form.status === 'closed' ? fromLocalInput(form.dateClose) : null;
+		if (dateCloseFinal && !stampRe.test(dateCloseFinal)) {
+			errorMsg = 'Дата закрытия: формат ГГГГ-ММ-ДД ЧЧ:ММ';
+			return;
+		}
 		errorMsg = '';
 		const payload = {
 			...form,
+			dateOpen: dateOpenFinal,
+			dateOpenManual: !(useCurrentTime && isNew),
 			pair: String(form.pair).toUpperCase(),
 			volume: Number(form.volume),
 			priceOpen: Number(form.priceOpen),
 			sl: form.sl === '' ? null : Number(form.sl),
 			tp: form.tp === '' ? null : Number(form.tp),
 			priceClose: form.status === 'closed' ? Number(form.priceClose) : null,
-			dateClose: form.status === 'closed' ? form.dateClose || nowStamp() : null,
+			dateClose: form.status === 'closed' ? dateCloseFinal || nowStamp() : null,
 			commission: Number(form.commission) || 0,
 			swap: Number(form.swap) || 0,
 			contractSize: form.contractSize === '' ? null : Number(form.contractSize)
@@ -114,7 +209,7 @@
 </script>
 
 {#if form}
-	<Modal bind:open title={isNew ? 'Новая сделка' : 'Сделка'} size="md" {onClose}>
+	<Modal bind:open title={isNew ? 'Новая сделка' : 'Сделка'} size="md" closeOnBackdrop={!dirty} onClose={requestClose}>
 		<div class="grid">
 			<label class="f">
 				<span>Инструмент</span>
@@ -142,9 +237,21 @@
 				<input type="number" step="any" bind:value={form.priceOpen} required />
 			</label>
 
-			<label class="f">
-				<span>Время открытия</span>
-				<input type="text" bind:value={form.dateOpen} placeholder="YYYY-MM-DD HH:mm:ss" />
+			<label class="f wide">
+				<span>Дата и время</span>
+				<div class="dt-row">
+					<label class="check">
+						<input type="checkbox" bind:checked={useCurrentTime} />
+						Текущее время
+					</label>
+					{#if !useCurrentTime}
+						<input
+							type="datetime-local"
+							value={toLocalInput(form.dateOpen)}
+							onchange={(e) => (form = { ...form, dateOpen: /** @type {HTMLInputElement} */ (e.target).value })}
+						/>
+					{/if}
+				</div>
 			</label>
 
 			<label class="f">
@@ -165,6 +272,28 @@
 				<input type="number" step="any" bind:value={form.tp} placeholder="—" />
 			</label>
 
+			<div class="f wide">
+				<span>R:R</span>
+				<div class="rr-row">
+					{#each RR_PRESETS as rr (rr.label)}
+						<button
+							type="button"
+							class="rr-btn"
+							class:active={riskInfo.rr != null && Math.abs(riskInfo.rr - rr.ratio) < 0.05}
+							disabled={!canApplyRr}
+							title="Заполни цену входа и SL, затем нажми — TP рассчитается автоматически"
+							onclick={() => applyRr(rr.ratio)}>{rr.label}</button
+						>
+					{/each}
+					<span class="risk-line">
+						Риск: <b class:loss={riskInfo.amount != null}>{riskInfo.amount != null ? riskInfo.amount.toFixed(2) + ' ' + currency : 'SL не задан'}</b>
+						{#if riskInfo.rr != null}
+							· R:R <b>1:{riskInfo.rr.toFixed(2)}</b>
+						{/if}
+					</span>
+				</div>
+			</div>
+
 			{#if form.status === 'closed'}
 				<label class="f">
 					<span>Цена закрытия</span>
@@ -172,7 +301,11 @@
 				</label>
 				<label class="f">
 					<span>Время закрытия</span>
-					<input type="text" bind:value={form.dateClose} placeholder="YYYY-MM-DD HH:mm:ss" />
+					<input
+						type="datetime-local"
+						value={toLocalInput(form.dateClose)}
+						onchange={(e) => (form = { ...form, dateClose: /** @type {HTMLInputElement} */ (e.target).value })}
+					/>
 				</label>
 			{/if}
 
@@ -210,7 +343,7 @@
 		</div>
 
 		{#if errorMsg}
-			<p class="err">{errorMsg}</p>
+			<p class="err" role="alert">{errorMsg}</p>
 		{/if}
 
 		{#snippet footer()}
@@ -225,10 +358,21 @@
 				>
 			{/if}
 			<div class="spacer"></div>
-			<button type="button" class="btn" onclick={close}>Отмена</button>
+			<button type="button" class="btn" onclick={requestClose}>Отмена</button>
 			<button type="button" class="btn primary" onclick={submit}>{isNew ? 'Создать' : 'Сохранить'}</button>
 		{/snippet}
 	</Modal>
+
+	{#if confirmDiscard}
+		<Modal bind:open={confirmDiscard} title="Закрыть без сохранения?" size="sm">
+			<p class="discard-text">Внесённые изменения будут потеряны.</p>
+			{#snippet footer()}
+				<div class="spacer"></div>
+				<button type="button" class="btn" onclick={() => (confirmDiscard = false)}>Продолжить редактирование</button>
+				<button type="button" class="btn danger-solid" onclick={discardAndClose}>Закрыть</button>
+			{/snippet}
+		</Modal>
+	{/if}
 {/if}
 
 <style>
@@ -247,7 +391,7 @@
 	}
 	.f span {
 		font-family: var(--font-mono);
-		font-size: 0.58rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--ink-muted);
@@ -273,6 +417,68 @@
 	textarea {
 		resize: vertical;
 	}
+	.dt-row {
+		display: flex;
+		align-items: center;
+		gap: 0.8rem;
+	}
+	.dt-row input {
+		flex: 1;
+	}
+	.check {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.8rem;
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.rr-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.rr-btn {
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		letter-spacing: 0.06em;
+		padding: 0.26rem 0.55rem;
+		color: var(--ink-muted);
+		background: transparent;
+		border: 1px solid var(--line);
+		border-radius: 2px;
+		cursor: pointer;
+		transition: color 0.2s, border-color 0.2s, background 0.2s;
+	}
+	.rr-btn:hover:not(:disabled) {
+		color: var(--ink);
+		border-color: var(--line-strong);
+	}
+	.rr-btn.active {
+		background: var(--sage);
+		border-color: var(--sage);
+		color: var(--bg);
+	}
+	.rr-btn:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+	.risk-line {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--ink-muted);
+		margin-left: auto;
+	}
+	.risk-line b {
+		font-weight: 500;
+		color: var(--ink);
+	}
+	.discard-text {
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--ink-muted);
+	}
 	.preview {
 		display: flex;
 		align-items: baseline;
@@ -281,7 +487,7 @@
 		padding-top: 0.7rem;
 		border-top: 1px solid var(--line);
 		font-family: var(--font-mono);
-		font-size: 0.68rem;
+		font-size: 0.7rem;
 	}
 	.pv-label {
 		color: var(--ink-muted);
@@ -298,42 +504,15 @@
 		color: var(--sage);
 	}
 	.loss {
-		color: var(--danger, #c98a8a);
+		color: var(--danger);
 	}
 	.err {
 		margin-top: 0.6rem;
 		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		color: var(--danger, #c98a8a);
+		font-size: 0.7rem;
+		color: var(--danger);
 	}
 	.spacer {
 		flex: 1;
-	}
-	.btn {
-		font-family: var(--font-mono);
-		font-size: 0.64rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		padding: 0.42rem 0.9rem;
-		color: var(--ink);
-		background: transparent;
-		border: 1px solid var(--line);
-		border-radius: 2px;
-		cursor: pointer;
-		transition:
-			border-color 0.2s,
-			background 0.2s;
-	}
-	.btn:hover {
-		border-color: var(--line-strong);
-	}
-	.btn.primary {
-		background: var(--sage);
-		color: var(--bg);
-		border-color: var(--sage);
-	}
-	.btn.danger {
-		color: var(--danger, #c98a8a);
-		border-color: color-mix(in srgb, var(--danger, #c98a8a) 40%, transparent);
 	}
 </style>

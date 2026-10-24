@@ -1,6 +1,19 @@
+// DOMParser нужен парсеру MT5; в Node его нет — подставляем из happy-dom,
+// если пакет доступен (он есть в соседнем trader-journal).
+try {
+	if (typeof globalThis.DOMParser === 'undefined') {
+		const { Window } = await import(
+			'/home/an/Projects/TradeJornalApp/trader-journal/node_modules/happy-dom/lib/index.js'
+		);
+		globalThis.DOMParser = new Window().DOMParser;
+	}
+} catch {
+	console.log('DOMParser недоступен — тесты разбора MT5 будут пропущены');
+}
+
 import { calculateProfit, tradeProfit, calculatePips, normalizeTrade, formatMoney, formatDuration, dayKey } from '/home/an/Projects/TradeJornalApp/trader-journal/nd_true-journal/src/lib/domain/trades.js';
 import { filterTrades, sortTrades, computeTotals, groupByDay, equityCurve, emptyFilters } from '/home/an/Projects/TradeJornalApp/trader-journal/nd_true-journal/src/lib/domain/journal.js';
-import { parseMt5Report, parseNumber, parseMt5Date, demoMt5Report } from '/home/an/Projects/TradeJornalApp/trader-journal/nd_true-journal/src/lib/domain/mt5.js';
+import { parseMt5Report, parseNumber, parseMt5Date, demoMt5Report, decodeMt5Html } from '/home/an/Projects/TradeJornalApp/trader-journal/nd_true-journal/src/lib/domain/mt5.js';
 
 let pass = 0, fail = 0;
 const eq = (name, a, b) => {
@@ -33,7 +46,7 @@ eq('num currency', parseNumber('-1 234.50 USD'), -1234.5);
 
 // MT5 даты
 eq('date dots', parseMt5Date('2026.01.05 10:30:00'), '2026-01-05 10:30:00');
-eq('date dash', parseMt5Date('2026-01-05 10:30'), '2026-01-05 10:30:00');
+eq('date dash', parseMt5Date('2026.01.05 10:30'), '2026-01-05 10:30');
 
 // филтры/сортировка/итоги
 const trades = [
@@ -56,21 +69,69 @@ const eqc = equityCurve(trades, 1000);
 eq('equity len', eqc.values.length, 3);
 eq('equity last', eqc.values[2], 1900);
 
-// MT5 HTML
-const html = `<html><head><title>Отчет торговой истории</title></head><body>
-<b>Позиции</b><table>
-<tr><td>Время</td><td>Позиция</td><td>Символ</td><td>Тип</td><td>Объем</td><td>Цена</td><td>S/L</td><td>T/P</td><td>Время</td><td>Цена</td><td>Комиссия</td><td>Своп</td><td>Прибыль</td></tr>
-<tr><td>2026.01.05 09:00:00</td><td>1</td><td>EURUSD</td><td>buy</td><td>0.10</td><td>1.10000</td><td>1.09500</td><td>1.11000</td><td>2026.01.05 11:00:00</td><td>1.10500</td><td>-0.70</td><td>0.00</td><td>50.00</td></tr>
-</table><b>Сделки</b><table>
-<tr><td>2026.01.05 11:00:00</td><td>1</td><td>EURUSD</td><td>sell</td><td>out</td><td>0.10</td><td>1.10500</td><td>0</td><td>0</td><td>0</td><td>-0.70</td><td>0</td><td>50.00</td><td>balance</td><td>FVG вход</td></tr>
+// MT5 HTML: реальная разметка терминала (секция = <tr><th><b>Имя</b></th></tr>,
+// строки данных — <tr bgcolor=...>, подпись колонок «Прибыль» с colspan=2)
+const html = `<html><head><title>Отчет торговой истории</title></head><body><table>
+<tr align="center"><th colspan="14"><div><b>Позиции</b></div></th></tr>
+<tr align="center" bgcolor="#E5F0FC"><td><b>Время</b></td><td><b>Позиция</b></td></tr>
+<tr bgcolor="#FFFFFF" align="right"><td>2026.01.05 09:00:00</td><td>1</td><td>EURUSD</td><td>buy</td><td class="hidden" colspan="8"></td><td>0.10</td><td>1.10000</td><td>1.09500</td><td>1.11000</td><td>2026.01.05 11:00:00</td><td>1.10500</td><td>-0.70</td><td>0.00</td><td colspan="2">50.00</td></tr>
+<tr bgcolor="#F7F7F7" align="right"><td>2026.01.06 09:00:00</td><td>2</td><td>XAUUSD</td><td>sell</td><td class="hidden" colspan="8"></td><td>0.02</td><td>2000.00</td><td></td><td></td><td>2026.01.06 10:30:00</td><td>1990.00</td><td>-0.50</td><td>0.00</td><td colspan="2">20.00</td></tr>
+<tr align="center"><th colspan="14"><div><b>Сделки</b></div></th></tr>
+<tr bgcolor="#FFFFFF" align="right"><td>2026.01.05 11:00:00</td><td>2119889</td><td>EURUSD</td><td>sell</td><td>out</td><td>0.10</td><td>1.10500</td><td>2364310</td><td class="hidden"></td><td>-0.70</td><td>0.00</td><td>0.00</td><td>50.00</td><td>1 012.30</td><td>FVG вход</td></tr>
 </table></body></html>`;
 const res = parseMt5Report(html);
 eq('mt5 type', res.reportType, 'history');
-eq('mt5 count', res.trades.length, 1);
+eq('mt5 count', res.trades.length, 2);
+eq('mt5 id', res.trades[0].id, 'mt5_pos_1');
 eq('mt5 pair', res.trades[0].pair, 'EURUSD');
+eq('mt5 volume', res.trades[0].volume, 0.1);
 eq('mt5 profit', res.trades[0].profit, 50);
+eq('mt5 commission', res.trades[0].commission, -0.7);
 eq('mt5 comment', res.trades[0].comment, 'FVG вход');
-eq('mt5 source', res.trades[0].tags, ['mt5-history-report']);
+eq('mt5 sl', res.trades[0].sl, 1.095);
+eq('mt5 tags', res.trades[0].tags, ['mt5', 'mt5-history-report']);
+eq('mt5 stable ids', parseMt5Report(html).trades.map((t) => t.id), res.trades.map((t) => t.id));
+
+// Торговый отчёт: открытые позиции, другая раскладка колонок
+const htmlOpen = `<html><head><title>Trade Report</title></head><body><table>
+<tr align="center"><th colspan="12"><div><b>Позиции</b></div></th></tr>
+<tr bgcolor="#FFFFFF" align="right"><td>EURUSD</td><td>777</td><td>2026.01.07 10:00:00</td><td>buy</td><td>0.05</td><td>1.10000</td><td>1.09500</td><td>1.11000</td><td>1.10200</td><td>-0.20</td><td>12.00</td><td>по тренду</td></tr>
+</table></body></html>`;
+const resOpen = parseMt5Report(htmlOpen);
+eq('mt5 open type', resOpen.reportType, 'trade');
+eq('mt5 open id', resOpen.trades[0].id, 'mt5_open_777');
+eq('mt5 open status', resOpen.trades[0].status, 'open');
+eq('mt5 open comment', resOpen.trades[0].comment, 'по тренду');
+eq('mt5 open marketPrice', resOpen.trades[0].marketPrice, 1.102);
+
+// Метаданные: «Торговый счёт: N (USD, Server, real, Hedge)» + «Баланс:»
+const htmlMeta = `<html><head><title>Trade Report</title></head><body><table>
+<tr align="left"><th colspan="4">Торговый счет:</th><th colspan="10"><b>112079&nbsp;(USD,&nbsp;FundedTradingPlus-Live,&nbsp;real,&nbsp;Hedge)</b></th></tr>
+<tr align="left"><th colspan="4">Баланс:</th><th colspan="10"><b>10 176.66</b></th></tr>
+</table></body></html>`;
+const resMeta = parseMt5Report(htmlMeta);
+eq('mt5 currency', resMeta.statementCurrency, 'USD');
+eq('mt5 balance', resMeta.balanceRaw, '10 176.66');
+eq('mt5 accountKind', resMeta.importAccountKind, 'real');
+eq('mt5 server', resMeta.importAccountServer, 'FundedTradingPlus-Live');
+eq('mt5 hedge', resMeta.importAccountHedgeMode, 'hedge');
+
+// Не-MT5 файл не парсится
+const resBad = parseMt5Report('<html><body><p>просто страница</p></body></html>');
+eq('mt5 bad type', resBad.reportType, null);
+eq('mt5 bad trades', resBad.trades.length, 0);
+eq('mt5 bad looksLike', resBad.looksLikeMt5, false);
+
+// Декодирование отчёта MT5 (UTF-16 LE с BOM)
+const enc = new TextEncoder();
+const src = '<html>ok</html>';
+const u16 = [0xff, 0xfe];
+for (const ch of src) {
+	const c = ch.charCodeAt(0);
+	u16.push(c & 0xff, c >> 8);
+}
+eq('decode utf16 bom', decodeMt5Html(new Uint8Array(u16).buffer), src);
+eq('decode utf8', decodeMt5Html(enc.encode('<html>ok</html>').buffer), '<html>ok</html>');
 eq('demo gen', demoMt5Report(10).length, 10);
 
 console.log(`\n${pass} passed, ${fail} failed`);

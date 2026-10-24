@@ -115,7 +115,12 @@ export function sortTrades(trades, sort) {
 	});
 }
 
-/** Переключить направление сортировки по клику на колонку. */
+/**
+ * Переключить направление сортировки по клику на колонку.
+ * @param {{key: string, dir: 'asc'|'desc'}} sort
+ * @param {string} key
+ * @returns {{key: string, dir: 'asc'|'desc'}}
+ */
 export function toggleSort(sort, key) {
 	if (sort.key !== key) return { key, dir: 'desc' };
 	return { key, dir: sort.dir === 'desc' ? 'asc' : 'desc' };
@@ -130,6 +135,11 @@ export function sortIndicator(sort, key) {
 /**
  * Итоги по списку.
  * @param {any[]} trades
+ */
+/**
+ * Итоги по списку сделок.
+ * @param {any[]} trades
+ * @returns {{profit: number, commission: number, swap: number, wins: number, losses: number, breakeven: number, winRate: number, count: number}}
  */
 export function computeTotals(trades) {
 	const acc = { profit: 0, commission: 0, swap: 0, wins: 0, losses: 0, breakeven: 0 };

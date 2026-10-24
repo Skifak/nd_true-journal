@@ -4,10 +4,10 @@
 	 * Разбор полностью локальный, файл никуда не отправляется.
 	 */
 	import Modal from './Modal.svelte';
-	import { parseMt5Report } from '#lib/domain/mt5.js';
+	import { decodeMt5Html, parseMt5Report } from '#lib/domain/mt5.js';
 	import { formatDate, formatMoney, tradeProfit } from '#lib/domain/trades.js';
 
-	/** @type {{open?: boolean, currency?: string, onImport?: (trades:any[])=>number, onClose?: ()=>void}} */
+	/** @type {{open?: boolean, currency?: string, onImport?: (trades:any[])=>number, onClose?: (added?: number)=>void}} */
 	let {
 		open = $bindable(false),
 		currency = 'USD',
@@ -15,20 +15,23 @@
 		onClose = () => {}
 	} = $props();
 
-	let result = $state(null);
+	let result = $state(/** @type {any} */ (null));
 	let fileName = $state('');
 	let busy = $state(false);
 	let errMsg = $state('');
 	let dragOver = $state(false);
 
+	/** @param {File} file */
 	async function handleFile(file) {
 		if (!file) return;
 		busy = true;
 		errMsg = '';
 		fileName = file.name;
 		try {
-			const text = await file.text();
-			result = parseMt5Report(text);
+			// MT5 сохраняет отчёты в UTF-16 LE с BOM — file.text() декодирует как UTF-8
+			// и получаются NUL-байты между символами, поэтому читаем ArrayBuffer сами
+			const buf = await file.arrayBuffer();
+			result = parseMt5Report(decodeMt5Html(buf));
 			if (!result.trades.length) errMsg = result.parseHint || 'Не удалось извлечь сделки';
 		} catch (e) {
 			errMsg = e instanceof Error ? e.message : String(e);
@@ -38,6 +41,7 @@
 		}
 	}
 
+	/** @param {DragEvent} e */
 	function onDrop(e) {
 		e.preventDefault();
 		dragOver = false;
@@ -45,6 +49,7 @@
 		if (f) handleFile(f);
 	}
 
+	/** @param {Event & {currentTarget: EventTarget & HTMLInputElement}} e */
 	function onPick(e) {
 		const f = e.currentTarget.files?.[0];
 		if (f) handleFile(f);
@@ -67,6 +72,10 @@
 		fileName = '';
 		onClose();
 	}
+
+	const typeLabel = $derived(
+		result?.reportType === 'history' ? 'история' : result?.reportType === 'trade' ? 'торговый отчёт' : 'неизвестно'
+	);
 
 	const closedStats = $derived.by(() => {
 		if (!result?.trades?.length) return null;
@@ -98,13 +107,10 @@
 		{:else}
 			<div class="file-line">
 				<span class="file-name">{fileName}</span>
-				<span class="tag"
-					>{result.reportType === 'history'
-						? 'история'
-						: result.reportType === 'trade'
-							? 'торговый отчёт'
-							: 'неизвестно'}</span
-				>
+				<span class="tag">{typeLabel}</span>
+				{#if result.statementCurrency}<span class="tag">{result.statementCurrency}</span>{/if}
+				{#if result.balanceRaw}<span class="tag">Баланс: {result.balanceRaw}</span>{/if}
+				{#if result.accountTitle}<span class="tag">{result.accountTitle}</span>{/if}
 			</div>
 
 			{#if closedStats}
@@ -132,7 +138,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each result.trades.slice(0, 12) as t (t.id)}
+						{#each /** @type {any[]} */ (result.trades).slice(0, 12) as t (t.id)}
 							{@const pl = tradeProfit(t)}
 							<tr>
 								<td class="mono">{formatDate(t.dateOpen)}</td>
@@ -217,7 +223,7 @@
 		color: var(--ink);
 	}
 	.tag {
-		font-size: 0.58rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		padding: 0.1rem 0.35rem;
@@ -253,7 +259,7 @@
 	table.preview th {
 		text-align: left;
 		font-family: var(--font-mono);
-		font-size: 0.58rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		color: var(--ink-muted);
@@ -283,41 +289,17 @@
 	}
 	.more {
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: 0.66rem;
 		color: var(--ink-muted);
 		padding: 0.5rem 0.4rem;
 	}
 	.err {
 		margin-top: 0.6rem;
 		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		color: var(--danger, #c98a8a);
+		font-size: 0.7rem;
+		color: var(--danger);
 	}
 	.spacer {
 		flex: 1;
-	}
-	.btn {
-		font-family: var(--font-mono);
-		font-size: 0.64rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		padding: 0.42rem 0.9rem;
-		color: var(--ink);
-		background: transparent;
-		border: 1px solid var(--line);
-		border-radius: 2px;
-		cursor: pointer;
-	}
-	.btn:hover {
-		border-color: var(--line-strong);
-	}
-	.btn.primary {
-		background: var(--sage);
-		color: var(--bg);
-		border-color: var(--sage);
-	}
-	.btn:disabled {
-		opacity: 0.4;
-		cursor: default;
 	}
 </style>

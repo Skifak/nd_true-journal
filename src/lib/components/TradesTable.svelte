@@ -35,6 +35,7 @@
 	 * }} */
 	let {
 		trades = [],
+		/** @type {{key: string, dir: 'asc'|'desc'}} */
 		sort = $bindable({ key: 'dateClose', dir: 'desc' }),
 		filters = $bindable(),
 		symbols = [],
@@ -74,11 +75,20 @@
 		if (page > 0 && page >= pages) page = pages - 1;
 	});
 
+	/** @param {{currentTarget: EventTarget & Element}} event @param {any} trade */
 	function openMenu(event, trade) {
 		const r = event.currentTarget.getBoundingClientRect();
-		rowMenu = { trade, x: Math.min(r.right, window.innerWidth - 210), y: r.bottom + 4 };
+		const menuH = 130; // примерная высота меню из 3 пунктов
+		// Переворот вверх, если меню не влезает снизу
+		const below = window.innerHeight - r.bottom - 8 > menuH;
+		rowMenu = {
+			trade,
+			x: Math.min(r.right, window.innerWidth - 210),
+			y: below ? r.bottom + 4 : Math.max(8, r.top - menuH - 4)
+		};
 	}
 
+	/** @param {(t: any) => void} fn @param {any} trade */
 	function runAction(fn, trade) {
 		rowMenu = null;
 		fn(trade);
@@ -86,6 +96,8 @@
 
 	const sourceLabel = { manual: 'вручную', 'mt5-history': 'MT5 history', 'mt5-trade': 'MT5 trade' };
 </script>
+
+<svelte:window onkeydown={(e) => e.key === 'Escape' && rowMenu && (rowMenu = null)} />
 
 <div class="table-wrap">
 	{#if trades.length === 0}
@@ -97,24 +109,54 @@
 		<table class="trades">
 			<thead>
 				<tr>
-					<th class="sortable" onclick={() => (sort = toggleSort(sort, 'dateOpen'))}
-						>Открыта{sortIndicator(sort, 'dateOpen')}</th
+					<th
+						class="sortable"
+						tabindex="0"
+						aria-sort={sort.key === 'dateOpen' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+						onclick={() => (sort = toggleSort(sort, 'dateOpen'))}
+						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (sort = toggleSort(sort, 'dateOpen')))}
+						>
+						Открыта{sortIndicator(sort, 'dateOpen')}</th
 					>
-					<th class="sortable" onclick={() => (sort = toggleSort(sort, 'dateClose'))}
-						>Закрыта{sortIndicator(sort, 'dateClose')}</th
+					<th
+						class="sortable"
+						tabindex="0"
+						aria-sort={sort.key === 'dateClose' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+						onclick={() => (sort = toggleSort(sort, 'dateClose'))}
+						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (sort = toggleSort(sort, 'dateClose')))}
+						>
+						Закрыта{sortIndicator(sort, 'dateClose')}</th
 					>
 					{#if visibleCols.duration}
-						<th class="sortable" onclick={() => (sort = toggleSort(sort, 'duration'))}
-							>Длит.{sortIndicator(sort, 'duration')}</th
+						<th
+						class="sortable"
+						tabindex="0"
+						aria-sort={sort.key === 'duration' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+						onclick={() => (sort = toggleSort(sort, 'duration'))}
+						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (sort = toggleSort(sort, 'duration')))}
+						>
+						Длит.{sortIndicator(sort, 'duration')}</th
 						>
 					{/if}
-					<th class="sortable" onclick={() => (sort = toggleSort(sort, 'pair'))}
-						>Пара{sortIndicator(sort, 'pair')}</th
+					<th
+						class="sortable"
+						tabindex="0"
+						aria-sort={sort.key === 'pair' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+						onclick={() => (sort = toggleSort(sort, 'pair'))}
+						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (sort = toggleSort(sort, 'pair')))}
+						>
+						Пара{sortIndicator(sort, 'pair')}</th
 					>
 					<th>Напр.</th>
 					{#if visibleCols.volume}
-						<th class="num sortable" onclick={() => (sort = toggleSort(sort, 'volume'))}
-							>Объём{sortIndicator(sort, 'volume')}</th
+						<th
+						class="num sortable"
+						tabindex="0"
+						aria-sort={sort.key === 'volume' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+						onclick={() => (sort = toggleSort(sort, 'volume'))}
+						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (sort = toggleSort(sort, 'volume')))}
+						>
+						Объём{sortIndicator(sort, 'volume')}</th
 						>
 					{/if}
 					{#if visibleCols.prices}<th class="num">Откр. / Закр.</th>{/if}
@@ -126,17 +168,35 @@
 						<th class="num">%</th>
 					{/if}
 					{#if visibleCols.commission}
-						<th class="num sortable" onclick={() => (sort = toggleSort(sort, 'commission'))}
-							>Комис.{sortIndicator(sort, 'commission')}</th
+						<th
+						class="num sortable"
+						tabindex="0"
+						aria-sort={sort.key === 'commission' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+						onclick={() => (sort = toggleSort(sort, 'commission'))}
+						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (sort = toggleSort(sort, 'commission')))}
+						>
+						Комис.{sortIndicator(sort, 'commission')}</th
 						>
 					{/if}
 					{#if visibleCols.swap}
-						<th class="num sortable" onclick={() => (sort = toggleSort(sort, 'swap'))}
-							>Своп{sortIndicator(sort, 'swap')}</th
+						<th
+						class="num sortable"
+						tabindex="0"
+						aria-sort={sort.key === 'swap' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+						onclick={() => (sort = toggleSort(sort, 'swap'))}
+						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (sort = toggleSort(sort, 'swap')))}
+						>
+						Своп{sortIndicator(sort, 'swap')}</th
 						>
 					{/if}
-					<th class="num sortable" onclick={() => (sort = toggleSort(sort, 'profit'))}
-						>P/L{sortIndicator(sort, 'profit')}</th
+					<th
+						class="num sortable"
+						tabindex="0"
+						aria-sort={sort.key === 'profit' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+						onclick={() => (sort = toggleSort(sort, 'profit'))}
+						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (sort = toggleSort(sort, 'profit')))}
+						>
+						P/L{sortIndicator(sort, 'profit')}</th
 					>
 					<th class="actions-col"></th>
 				</tr>
@@ -159,7 +219,13 @@
 						{@const pips = calculatePips(trade)}
 						{@const pct = calculatePricePercent(trade)}
 						{@const pl = tradeProfit(trade)}
-						<tr class="trade-row" onclick={() => onEdit(trade)}>
+						<tr
+							class="trade-row"
+							tabindex="0"
+							aria-label="Сделка {trade.pair}: открыть для изменения"
+							onclick={() => onEdit(trade)}
+							onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onEdit(trade))}
+						>
 							<td class="mono">{formatDate(trade.dateOpen)}</td>
 							<td class="mono">{trade.dateClose ? formatDate(trade.dateClose) : '—'}</td>
 							{#if visibleCols.duration}
@@ -204,7 +270,9 @@
 								<button
 									class="row-menu-btn"
 									title="Действия"
-									aria-label="Действия"
+									aria-label="Действия со сделкой {trade.pair}"
+									aria-haspopup="menu"
+									aria-expanded={rowMenu?.trade.id === trade.id}
 									onclick={(e) => {
 										e.stopPropagation();
 										openMenu(e, trade);
@@ -250,16 +318,18 @@
 </div>
 
 {#if rowMenu}
-	<button class="menu-backdrop" aria-label="Закрыть" onclick={() => (rowMenu = null)}></button>
-	<div class="row-menu" style:left="{rowMenu.x}px" style:top="{rowMenu.y}px">
-		<button onclick={() => runAction(onEdit, rowMenu.trade)}>
+	{@const menu = rowMenu}
+	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+	<div class="menu-backdrop" role="presentation" onclick={() => (rowMenu = null)}></div>
+	<div class="row-menu" style:left="{menu.x}px" style:top="{menu.y}px">
+		<button onclick={() => runAction(onEdit, menu.trade)}>
 			<span class="mi">✎</span> Изменить
 		</button>
-		<button onclick={() => runAction(onDuplicate, rowMenu.trade)}>
+		<button onclick={() => runAction(onDuplicate, menu.trade)}>
 			<span class="mi">⧉</span> Дублировать
 		</button>
 		<div class="menu-sep"></div>
-		<button class="danger" onclick={() => runAction(onDelete, rowMenu.trade)}>
+		<button class="danger" onclick={() => runAction(onDelete, menu.trade)}>
 			<span class="mi">✕</span> Удалить
 		</button>
 	</div>
@@ -276,11 +346,12 @@
 	}
 	thead th {
 		position: sticky;
-		top: 0;
-		z-index: 2;
+		/* Прилипание к верху вьюпорта, под топбаром (контейнер прокрутки — окно) */
+		top: var(--topbar-h, 52px);
+		z-index: 5;
 		text-align: left;
 		font-family: var(--font-mono);
-		font-size: 0.6rem;
+		font-size: 0.66rem;
 		font-weight: 400;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
@@ -309,12 +380,22 @@
 		vertical-align: middle;
 		white-space: nowrap;
 	}
+	strong {
+		font-weight: 500;
+	}
 	.trade-row {
 		cursor: pointer;
 		transition: background 0.15s;
 	}
 	.trade-row:hover td {
 		background: color-mix(in srgb, var(--ink) 4%, transparent);
+	}
+	.trade-row:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+	}
+	.trade-row:focus:not(:focus-visible) {
+		outline: none;
 	}
 	.mono {
 		font-family: var(--font-mono);
@@ -332,7 +413,7 @@
 	}
 	.dir {
 		font-family: var(--font-mono);
-		font-size: 0.6rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.08em;
 		padding: 0.12rem 0.32rem;
 		border: 1px solid var(--line);
@@ -374,7 +455,7 @@
 	}
 	.day-stat {
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: 0.66rem;
 		color: var(--ink-muted);
 		margin-right: 0.45rem;
 	}
@@ -438,7 +519,7 @@
 	}
 	.pager-btn {
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		padding: 0.35rem 0.7rem;
@@ -461,7 +542,7 @@
 	}
 	.pager-info {
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: 0.66rem;
 		color: var(--ink-muted);
 	}
 	.empty {
@@ -529,8 +610,10 @@
 		margin: 0.2rem 0;
 	}
 	@media (max-width: 1100px) {
-		.table-wrap {
-			overflow-x: auto;
+		.day-pnl {
+			float: none;
+			display: block;
+			margin-top: 0.15rem;
 		}
 	}
 </style>

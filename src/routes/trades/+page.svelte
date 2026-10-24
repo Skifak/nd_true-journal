@@ -108,11 +108,12 @@
 		showToast('Сделка дублирована');
 	}
 
+	/** @param {any[]} trades */
 	function handleImport(trades) {
-		const n = importTrades(trades);
-		return n;
+		return importTrades(trades);
 	}
 
+	/** @param {number} [added] */
 	function onImportClose(added) {
 		if (typeof added === 'number') {
 			showToast(added ? `Импортировано: ${added}` : 'Новых сделок нет (дубликаты)');
@@ -167,7 +168,7 @@
 	{/if}
 
 	{#if toast}
-		<div class="toast">{toast}</div>
+		<div class="toast" role="status">{toast}</div>
 	{/if}
 </section>
 
@@ -188,14 +189,13 @@
 	{#snippet footer()}
 		<div class="spacer"></div>
 		<button class="btn" onclick={() => (confirmWipe = false)}>Отмена</button>
-		<button class="btn danger" onclick={wipeAll}>Удалить</button>
+		<button class="btn danger-solid" onclick={wipeAll}>Удалить</button>
 	{/snippet}
 </Modal>
 
 <style>
 	.page {
-		padding: var(--sp-lg, 2rem) var(--sp-md, 1.5rem) 3rem;
-		max-width: 1600px;
+		padding: var(--sp-lg) var(--sp-md) 3rem;
 	}
 	.page-head {
 		display: flex;
@@ -255,24 +255,9 @@
 	.spacer {
 		flex: 1;
 	}
-	.btn {
-		font-family: var(--font-mono);
-		font-size: 0.64rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		padding: 0.42rem 0.9rem;
-		color: var(--ink);
-		background: transparent;
-		border: 1px solid var(--line);
-		border-radius: 2px;
-		cursor: pointer;
-	}
-	.btn:hover {
-		border-color: var(--line-strong);
-	}
-	.btn.danger {
-		background: var(--danger, #c98a8a);
-		border-color: var(--danger, #c98a8a);
-		color: var(--bg);
+	@media (max-width: 760px) {
+		.toast {
+			bottom: calc(var(--tabbar-h, 56px) + 0.8rem);
+		}
 	}
 </style>

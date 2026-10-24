@@ -7,11 +7,20 @@
 
 	const nav = [
 		{ idx: '01', label: 'Дашборд', path: '/' },
-		{ idx: '02', label: 'Все сделки', path: '/trades' },
-		{ idx: '03', label: 'Заметки', path: '/notes' }
+		{ idx: '02', label: 'Все сделки', path: '/trades' }
 	];
 
 	const current = $derived(nav.find((n) => n.path === page.url.pathname) ?? nav[0]);
+
+	// Живая дата в топбаре (обновляется раз в минуту)
+	let now = $state(new Date());
+	$effect(() => {
+		const t = setInterval(() => (now = new Date()), 60_000);
+		return () => clearInterval(t);
+	});
+	const dateLabel = $derived(
+		now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })
+	);
 </script>
 
 <svelte:head>
@@ -43,13 +52,38 @@
 				<span class="nav-idx">{current.idx} ／</span>
 				{current.label}
 			</span>
-			<span class="topbar-right eyebrow">{new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })}</span>
+			<span class="topbar-right eyebrow">{dateLabel}</span>
 		</header>
 		<main>
 			{@render children()}
 		</main>
 	</div>
 </div>
+
+<!-- Мобильная навигация: SVG-иконки в стиле сайта (line-иконки, hairline) -->
+<nav class="tabbar" aria-label="Разделы">
+	{#each nav as item (item.path)}
+		<a
+			class="tab"
+			class:active={item.path === current.path}
+			href={item.path}
+			aria-current={item.path === current.path ? 'page' : undefined}
+		>
+			{#if item.path === '/'}
+				<svg viewBox="0 0 20 20" aria-hidden="true">
+					<path d="M2.5 10.5 8 5l3.5 3.5L17 3M17 3v5M17 3h-5" />
+					<path d="M2.5 17h15" />
+				</svg>
+			{:else}
+				<svg viewBox="0 0 20 20" aria-hidden="true">
+					<rect x="2.5" y="3.5" width="15" height="13" />
+					<path d="M2.5 7.5h15M7.5 7.5v9" />
+				</svg>
+			{/if}
+			<span>{item.label}</span>
+		</a>
+	{/each}
+</nav>
 
 <style>
 	.shell {
@@ -134,7 +168,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		height: 52px;
+		height: var(--topbar-h);
 		padding: 0 var(--sp-lg);
 		border-bottom: 1px solid var(--line);
 		background: rgba(22, 24, 25, 0.92);
@@ -152,9 +186,53 @@
 		padding: var(--sp-lg);
 	}
 
+	/* --- Мобильный таб-бар --- */
+	.tabbar {
+		display: none;
+	}
+
 	@media (max-width: 760px) {
 		.sidebar {
 			display: none;
+		}
+		main {
+			padding: var(--sp-md) var(--sp-sm) calc(var(--tabbar-h) + var(--sp-md));
+		}
+		.tabbar {
+			position: fixed;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			z-index: 20;
+			display: flex;
+			height: var(--tabbar-h);
+			background: var(--panel-solid);
+			border-top: 1px solid var(--line);
+			padding-bottom: env(safe-area-inset-bottom);
+		}
+		.tab {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 3px;
+			font-family: var(--font-mono);
+			font-size: 0.56rem;
+			letter-spacing: 0.12em;
+			text-transform: uppercase;
+			color: var(--ink-muted);
+		}
+		.tab svg {
+			width: 20px;
+			height: 20px;
+			fill: none;
+			stroke: currentColor;
+			stroke-width: 1.2;
+			stroke-linecap: square;
+		}
+		.tab.active {
+			color: var(--sage);
 		}
 	}
 </style>

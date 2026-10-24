@@ -41,7 +41,7 @@
 		setTimeout(() => (saved = ''), 2500);
 	}
 
-	// KPI-метрики (пока демо-значения, дальше — из реальных сделок)
+	// KPI-метрики — демо-данные до подключения реального источника
 	const kpis = [
 		{ label: 'Баланс', value: '0,00 $', delta: null },
 		{ label: 'Сделок за месяц', value: '0', delta: null },
@@ -49,6 +49,7 @@
 		{ label: 'Дисциплина', value: '—', delta: null }
 	];
 
+	// Демо-события до подключения реального журнала активности
 	const activity = [
 		{ icon: '＋', title: 'Журнал создан', time: 'только что' },
 		{ icon: '◈', title: 'Платформа: ' + detectPlatform(), time: 'при запуске' },
@@ -57,7 +58,8 @@
 </script>
 
 <!-- KPI-сетка: плотная, с волосяными gap-px разделителями -->
-<section class="kpi-grid" aria-label="Ключевые показатели">
+<section class="kpi-grid" aria-label="Ключевые показатели (демо-данные)">
+	<div class="demo-flag"><span class="eyebrow">демо-данные</span></div>
 	{#each kpis as kpi}
 		<div class="kpi">
 			<p class="kpi-label">{kpi.label}</p>
@@ -81,10 +83,10 @@
 					labelExpand="Развернуть график"
 					labelCollapse="Свернуть график"
 				/>
-				<span class="eyebrow">все сделки</span>
+				<span class="eyebrow">демо · все сделки</span>
 			</div>
 		</div>
-		<div class="chart-slot" class:expanded={chartExpanded}>
+		<div class="chart-slot">
 			<EquityChart
 				values={CHART_DATASETS[chartDataset].values}
 				yMin={0}
@@ -118,7 +120,7 @@
 		</div>
 		<textarea bind:value={note} rows="4" placeholder="Что важно запомнить с сегодняшней сессии…"></textarea>
 		<div class="row">
-			<button class="btn" onclick={save}>Сохранить</button>
+			<button class="text-link" onclick={save}>Сохранить</button>
 			{#if saved}<span class="hint">↳ {saved}</span>{/if}
 		</div>
 	</div>
@@ -133,7 +135,7 @@
 		<span class="fh-c fh-br" aria-hidden="true"></span>
 		<div class="panel-head">
 			<h2 class="panel-title">Активность</h2>
-			<span class="eyebrow">последние события</span>
+			<span class="eyebrow">демо</span>
 		</div>
 		<ul class="feed">
 			{#each activity as a}
@@ -170,12 +172,20 @@
 <style>
 	/* KPI: сетка с 1px-зазорами, залитыми линией */
 	.kpi-grid {
+		position: relative;
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
 		gap: 1px;
 		background: var(--line);
 		border: 1px solid var(--line);
 		margin-bottom: var(--sp-lg);
+	}
+	.demo-flag {
+		position: absolute;
+		top: 6px;
+		right: 10px;
+		opacity: 0.6;
+		z-index: 1;
 	}
 	.kpi {
 		background: var(--bg);
@@ -269,32 +279,6 @@
 		margin-bottom: var(--sp-lg);
 	}
 
-	.empty {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		text-align: center;
-		padding: var(--sp-xl) 0;
-	}
-	.spark {
-		width: 200px;
-		height: 60px;
-		margin-bottom: var(--sp-md);
-	}
-	.empty-title {
-		font-family: var(--font-display);
-		font-size: 1.35rem;
-		margin: 0;
-	}
-	.empty-desc {
-		margin: var(--sp-xs) 0 0;
-		font-size: 0.8rem;
-		color: var(--ink-muted);
-		max-width: 34ch;
-	}
-
 	textarea {
 		width: 100%;
 		background: transparent;
@@ -314,21 +298,6 @@
 		align-items: center;
 		gap: var(--sp-md);
 		margin-top: var(--sp-md);
-	}
-	.btn {
-		background: transparent;
-		border: none;
-		border-bottom: 1px solid var(--accent);
-		border-radius: 0;
-		color: var(--ink);
-		font-size: 0.72rem;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		padding: 10px 0;
-		transition: color 250ms var(--ease-out);
-	}
-	.btn:hover {
-		color: #fff;
 	}
 	.hint {
 		font-size: 0.72rem;
@@ -405,6 +374,11 @@
 		}
 		.grid-2 {
 			grid-template-columns: 1fr;
+		}
+	}
+	@media (max-width: 760px) {
+		.chart-sets {
+			flex-wrap: wrap;
 		}
 	}
 </style>

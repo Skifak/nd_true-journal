@@ -84,6 +84,7 @@
 			type="button"
 			class="chip"
 			class:on={filters.onlyWins}
+			aria-pressed={filters.onlyWins}
 			onclick={() => {
 				filters.onlyWins = !filters.onlyWins;
 				if (filters.onlyWins) filters.onlyLosses = false;
@@ -93,6 +94,7 @@
 			type="button"
 			class="chip"
 			class:on={filters.onlyLosses}
+			aria-pressed={filters.onlyLosses}
 			onclick={() => {
 				filters.onlyLosses = !filters.onlyLosses;
 				if (filters.onlyLosses) filters.onlyWins = false;
@@ -139,7 +141,7 @@
 
 	<button type="button" class="act" onclick={onImport}>Импорт MT5</button>
 	<button type="button" class="act primary" onclick={onAdd}>+ Сделка</button>
-	<button type="button" class="act danger" onclick={onDeleteAll} title="Удалить все сделки">✕</button>
+	<button type="button" class="act danger" onclick={onDeleteAll} title="Удалить все сделки" aria-label="Удалить все сделки">✕</button>
 </div>
 
 <style>
@@ -189,7 +191,7 @@
 		align-items: center;
 		gap: 0.35rem;
 		font-family: var(--font-mono);
-		font-size: 0.58rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		color: var(--ink-muted);
@@ -211,36 +213,12 @@
 		display: flex;
 		gap: 0.3rem;
 	}
-	.chip {
-		font-family: var(--font-mono);
-		font-size: 0.6rem;
-		letter-spacing: 0.06em;
-		padding: 0.26rem 0.55rem;
-		color: var(--ink-muted);
-		background: transparent;
-		border: 1px solid var(--line);
-		border-radius: 2px;
-		cursor: pointer;
-		transition:
-			color 0.2s,
-			border-color 0.2s,
-			background 0.2s;
-	}
-	.chip:hover {
-		color: var(--ink);
-		border-color: var(--line-strong);
-	}
-	.chip.on {
-		background: var(--sage);
-		border-color: var(--sage);
-		color: var(--bg);
-	}
 	.spacer {
 		flex: 1;
 	}
 	.counter {
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: 0.66rem;
 		color: var(--ink-muted);
 	}
 	.cols-wrap {
@@ -287,7 +265,7 @@
 	}
 	.cols-title {
 		font-family: var(--font-mono);
-		font-size: 0.58rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--ink-muted);
@@ -313,7 +291,7 @@
 	}
 	.act {
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.07em;
 		text-transform: uppercase;
 		padding: 0.36rem 0.7rem;

@@ -107,6 +107,10 @@
 	--sp-lg: 22px;
 	--sp-xl: 28px;
 
+	/* Хром приложения */
+	--topbar-h: 52px;
+	--tabbar-h: 56px;
+
 	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
 	color-scheme: dark;
@@ -131,13 +135,21 @@ body {
 	font-size: 0.92rem;
 	line-height: 1.6;
 	-webkit-font-smoothing: antialiased;
-	overflow-x: hidden;
+	/* Широкие таблицы скроллится окно: только так sticky-заголовки
+	   колонок остаются приклеенными к вьюпорту */
+	overflow-x: auto;
 }
 
 h1, h2, h3 {
 	font-family: var(--font-display);
 	font-weight: 400;
 	margin: 0;
+}
+
+/* Полужирный Rubik: загружен только 400 — синтетический bold замылен,
+   поэтому semibold имитируем весом 500 и цветом */
+strong {
+	font-weight: 500;
 }
 
 a {
@@ -197,34 +209,64 @@ button {
 	color: #fff;
 }
 
-/* Чип и бейдж */
+/* Чип: моно-микрокнопка состояния (вкл — заливка шалфеем) */
 .chip {
 	display: inline-block;
-	background: transparent;
-	border: 1px solid var(--line);
-	border-radius: 0;
-	color: var(--ink-muted);
+	font-family: var(--font-mono);
 	font-size: 0.66rem;
 	letter-spacing: 0.06em;
-	padding: 4px 10px;
-}
-.badge {
-	display: inline-block;
+	padding: 0.26rem 0.55rem;
+	color: var(--ink-muted);
 	background: transparent;
-	border: 1px solid var(--line-strong);
-	border-radius: 0;
+	border: 1px solid var(--line);
+	border-radius: 2px;
+	cursor: pointer;
+	transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.chip:hover {
 	color: var(--ink);
-	font-size: 0.72rem;
-	letter-spacing: 0.08em;
-	padding: 5px 12px;
+	border-color: var(--line-strong);
+}
+.chip.on {
+	background: var(--sage);
+	border-color: var(--sage);
+	color: var(--bg);
 }
 
-/* Сериф-подпись */
-.quiet-note {
-	font-family: var(--font-display);
-	font-style: italic;
-	font-size: 1.1rem;
-	color: var(--ink-muted);
+/* Кнопка: волосяной контур, моно-капс. Единый стиль для страниц и диалогов */
+.btn {
+	font-family: var(--font-mono);
+	font-size: 0.66rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	padding: 0.42rem 0.9rem;
+	color: var(--ink);
+	background: transparent;
+	border: 1px solid var(--line);
+	border-radius: 2px;
+	cursor: pointer;
+	transition: border-color 0.2s, background 0.2s;
+}
+.btn:hover {
+	border-color: var(--line-strong);
+}
+.btn.primary {
+	background: var(--sage);
+	color: var(--bg);
+	border-color: var(--sage);
+}
+.btn.danger {
+	color: var(--danger);
+	border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+.btn.danger-solid {
+	background: var(--danger);
+	border-color: var(--danger);
+	color: var(--bg);
+}
+.btn:disabled {
+	opacity: 0.4;
+	cursor: default;
 }
 
 @media (prefers-reduced-motion: reduce) {

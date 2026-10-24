@@ -125,9 +125,6 @@
 	>
 		<div
 			class="dialog"
-			class:sm={size === 'sm'}
-			class:lg={size === 'lg'}
-			class:xl={size === 'xl'}
 			bind:this={dialogEl}
 			role="dialog"
 			aria-modal="true"
@@ -230,7 +227,7 @@
 	.sub {
 		margin-top: 0.3rem;
 		font-family: var(--font-mono);
-		font-size: 0.63rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.06em;
 		color: var(--ink-muted);
 	}

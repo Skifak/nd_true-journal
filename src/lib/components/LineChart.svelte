@@ -27,7 +27,9 @@
 	 *   showPoints?: boolean,
 	 *   stroke?: string,
 	 *   fill?: string,
-	 *   strokeWidth?: number
+	 *   strokeWidth?: number,
+	 *   yMin?: number | null,
+	 *   yMax?: number | null
 	 * }}
 	 */
 	let {
@@ -60,8 +62,9 @@
 	const DEBOUNCE_MS = 250;
 
 	// --- Замер контейнера (аналог useDimensions: ResizeObserver + debounce) ---
-	let wrapEl = $state(null);
+	let wrapEl = $state(/** @type {HTMLElement|null} */ (null));
 	let measured = $state({ width: 0, height: 0 });
+	/** @type {any} */
 	let debounceId;
 
 	$effect(() => {
@@ -183,6 +186,7 @@
 		hoverIdx >= 0 ? geometry.pts[hoverIdx] : geometry.pts[geometry.pts.length - 1]
 	);
 
+	/** @param {number} x */
 	function nearestX(x) {
 		let best = 0;
 		for (let i = 1; i < geometry.pts.length; i++) {
@@ -191,6 +195,7 @@
 		return best;
 	}
 
+	/** @param {PointerEvent & {currentTarget: EventTarget & SVGSVGElement}} e */
 	function onMove(e) {
 		if (!showPoints) return;
 		const rect = e.currentTarget.getBoundingClientRect();
@@ -330,12 +335,15 @@
 	.diagram {
 		display: block;
 		overflow: visible;
+		/* SVG не шире контейнера на узких экранах (min-width W ≥ 340 может превышать) */
+		max-width: 100%;
 	}
 	.chart.interactive {
 		cursor: crosshair;
 		touch-action: none;
 	}
 	.line-draw {
+		stroke-dasharray: 1;
 		animation: line-in 1.8s cubic-bezier(0.4, 0.1, 0.2, 1) forwards;
 	}
 	@keyframes line-in {
@@ -365,6 +373,7 @@
 	@media (prefers-reduced-motion: reduce) {
 		.line-draw {
 			animation: none;
+			stroke-dasharray: none;
 			stroke-dashoffset: 0;
 		}
 		.glow {

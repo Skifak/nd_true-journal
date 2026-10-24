@@ -118,19 +118,32 @@ export function duplicateTrade(id) {
 
 /**
  * Добавить импортированные сделки (MT5).
+ *
+ * ЛОГИКА ПЕРЕНЕСЕНА БЕЗ ИЗМЕНЕНИЙ из старого журнала
+ * (trader-journal/src/lib/journalImportApply.js + stores.js):
+ *  1) merge по `id` — импортированная запись перезаписывает свои поля поверх
+ *     существующей, id сохраняется (поэтому повторный импорт обновляет, а не дублирует);
+ *  2) затем массив заменяется целиком, без дедупликации по «дата|пара|объём».
+ *
  * @param {any[]} imported
- * @returns {number} сколько добавлено
+ * @returns {number} сколько сделок было в импорте
  */
 export function importTrades(imported) {
 	if (!Array.isArray(imported) || !imported.length) return 0;
-	const existing = new Set(trades.map((t) => `${t.dateOpen}|${t.pair}|${t.volume}`));
-	const fresh = imported
-		.map((t) => normalizeTrade(t))
-		.filter((t) => !existing.has(`${t.dateOpen}|${t.pair}|${t.volume}`));
-	if (!fresh.length) return 0;
-	trades = [...fresh, ...trades];
+	// merge по id — как в старом журнале перед importTrades
+	const existingById = new Map(trades.map((t) => [t.id, t]));
+	for (const importedTrade of imported) {
+		const prev = existingById.get(importedTrade.id);
+		const merged = {
+			...(prev && typeof prev === 'object' ? prev : {}),
+			...importedTrade,
+			id: importedTrade.id
+		};
+		existingById.set(importedTrade.id, merged);
+	}
+	trades = Array.from(existingById.values()).map((t) => normalizeTrade(t));
 	scheduleSave();
-	return fresh.length;
+	return imported.length;
 }
 
 /** Удалить все сделки. */
