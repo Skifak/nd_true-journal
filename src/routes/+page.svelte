@@ -178,7 +178,7 @@
 		gap: 1px;
 		background: var(--line);
 		border: 1px solid var(--line);
-		margin-bottom: var(--sp-lg);
+		margin-bottom: var(--sp-xl);
 	}
 	.demo-flag {
 		position: absolute;
@@ -275,8 +275,8 @@
 	.grid-2 {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: var(--sp-md);
-		margin-bottom: var(--sp-lg);
+		gap: var(--sp-xl);
+		margin-bottom: var(--sp-xl);
 	}
 
 	textarea {

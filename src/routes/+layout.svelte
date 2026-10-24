@@ -28,16 +28,31 @@
 </svelte:head>
 
 <div class="shell">
-	<aside class="sidebar">
-		<div class="brand">
-			<span class="wordmark">TRUE JOURNAL</span>
-			<span class="brand-sub">nd · офлайн</span>
-		</div>
+	<!-- Рейка: свёрнута по умолчанию, раскрывается по наведению/фокусу, скрывается при уходе курсора -->
+	<aside class="sidebar" aria-label="Разделы">
+		<a class="brand" href="/" title="true journal">
+			<img class="logo" src={favicon} alt="" width="26" height="26" />
+			<span class="brand-text">
+				<span class="wordmark">TRUE JOURNAL</span>
+				<span class="brand-sub">nd · офлайн</span>
+			</span>
+		</a>
 		<nav>
 			{#each nav as item (item.path)}
-				<a class="nav-item" class:active={item.path === current.path} href={item.path}>
-					<span class="nav-idx">{item.idx}</span>
+				<a class="nav-item" class:active={item.path === current.path} href={item.path} title={item.label}>
+					{#if item.path === '/'}
+						<svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
+							<path d="M2.5 10.5 8 5l3.5 3.5L17 3M17 3v5M17 3h-5" />
+							<path d="M2.5 17h15" />
+						</svg>
+					{:else}
+						<svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
+							<rect x="2.5" y="3.5" width="15" height="13" />
+							<path d="M2.5 7.5h15M7.5 7.5v9" />
+						</svg>
+					{/if}
 					<span class="nav-label">{item.label}</span>
+					<span class="nav-idx">{item.idx}</span>
 				</a>
 			{/each}
 		</nav>
@@ -87,24 +102,53 @@
 
 <style>
 	.shell {
-		display: flex;
 		min-height: 100dvh;
 	}
 
-	/* --- Сайдбар --- */
+	/* --- Сайдбар-рейка: 56px свёрнута, 240px по наведению (поверх контента) --- */
 	.sidebar {
-		width: 224px;
-		flex-shrink: 0;
+		--rail-w: 56px;
+		--rail-w-open: 240px;
+		position: fixed;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		z-index: 30;
+		width: var(--rail-w);
+		background: var(--panel-solid);
 		border-right: 1px solid var(--line);
 		display: flex;
 		flex-direction: column;
-		position: sticky;
-		top: 0;
-		height: 100dvh;
+		overflow: hidden;
+		transition: width 180ms var(--ease-out);
 	}
+	.sidebar:hover,
+	.sidebar:focus-within {
+		width: var(--rail-w-open);
+	}
+
+	/* Шапка рейки — ровно в высоту топбара: одна линия с панелью */
 	.brand {
-		padding: var(--sp-lg) var(--sp-md);
+		flex: none;
+		height: var(--topbar-h);
+		display: flex;
+		align-items: center;
+		gap: var(--sp-sm);
+		padding: 0 15px;
 		border-bottom: 1px solid var(--line);
+		white-space: nowrap;
+	}
+	.logo {
+		flex: none;
+		width: 26px;
+		height: 26px;
+	}
+	.brand-text {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		opacity: 0;
+		transition: opacity 140ms var(--ease-out) 40ms;
 	}
 	.wordmark {
 		font-family: var(--font-wordmark);
@@ -112,54 +156,89 @@
 		font-weight: 400;
 		letter-spacing: 0.015em;
 		opacity: 0.75;
-		display: block;
 	}
 	.brand-sub {
-		display: block;
 		margin-top: 4px;
+		font-family: var(--font-mono);
+		font-size: 0.6rem;
+		color: var(--ink-muted);
 	}
+
 	nav {
-		padding: var(--sp-sm) var(--sp-xs);
+		padding: var(--sp-sm) 0;
 		display: flex;
 		flex-direction: column;
 	}
 	.nav-item {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: var(--sp-sm);
-		padding: 9px 12px;
+		padding: 9px 15px;
 		font-size: 0.72rem;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--ink-muted);
 		border-left: 2px solid transparent;
-		transition: color 200ms var(--ease-out), border-color 200ms var(--ease-out), padding-left 200ms var(--ease-out);
+		white-space: nowrap;
+		transition: color 200ms var(--ease-out), border-color 200ms var(--ease-out);
 	}
 	.nav-item:hover {
 		color: var(--ink);
-		padding-left: 14px;
 	}
 	.nav-item.active {
 		color: var(--ink);
 		border-left-color: var(--accent);
 	}
+	.nav-ico {
+		flex: none;
+		width: 20px;
+		height: 20px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.2;
+		stroke-linecap: square;
+	}
+	.nav-label {
+		opacity: 0;
+		transition: opacity 140ms var(--ease-out) 40ms;
+	}
 	.nav-idx {
+		margin-left: auto;
 		font-size: 0.6rem;
 		color: var(--accent);
 		letter-spacing: 0.1em;
+		opacity: 0;
+		transition: opacity 140ms var(--ease-out) 40ms;
 	}
-	.sidebar-foot {
-		margin-top: auto;
-		padding: var(--sp-md);
-		border-top: 1px solid var(--line);
+	.sidebar:hover .brand-text,
+	.sidebar:focus-within .brand-text,
+	.sidebar:hover .nav-label,
+	.sidebar:focus-within .nav-label,
+	.sidebar:hover .nav-idx,
+	.sidebar:focus-within .nav-idx {
+		opacity: 1;
 	}
 
-	/* --- Контент --- */
+	.sidebar-foot {
+		margin-top: auto;
+		padding: var(--sp-md) 15px;
+		border-top: 1px solid var(--line);
+		white-space: nowrap;
+		opacity: 0;
+		transition: opacity 140ms var(--ease-out) 40ms;
+	}
+	.sidebar:hover .sidebar-foot,
+	.sidebar:focus-within .sidebar-foot {
+		opacity: 1;
+	}
+
+	/* --- Контент: постоянный отступ под рейку, панель поверх при раскрытии --- */
 	.content {
 		flex: 1;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
+		padding-left: 56px;
 	}
 	.topbar {
 		position: sticky;
@@ -171,7 +250,7 @@
 		height: var(--topbar-h);
 		padding: 0 var(--sp-lg);
 		border-bottom: 1px solid var(--line);
-		background: rgba(22, 24, 25, 0.92);
+		background: var(--panel-solid);
 	}
 	.breadcrumb {
 		font-size: 0.72rem;
@@ -194,6 +273,9 @@
 	@media (max-width: 760px) {
 		.sidebar {
 			display: none;
+		}
+		.content {
+			padding-left: 0;
 		}
 		main {
 			padding: var(--sp-md) var(--sp-sm) calc(var(--tabbar-h) + var(--sp-md));

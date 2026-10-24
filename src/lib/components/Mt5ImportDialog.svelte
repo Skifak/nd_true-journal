@@ -94,7 +94,13 @@
 		const closed = result.trades.filter((t) => t.status === 'closed');
 		const profit = closed.reduce((s, t) => s + tradeProfit(t), 0);
 		const wins = closed.filter((t) => tradeProfit(t) > 0).length;
-		return { count: result.trades.length, closed: closed.length, profit, wins };
+		return {
+			count: result.trades.length,
+			closed: closed.length,
+			profit,
+			wins,
+			winrate: closed.length ? Math.round((wins / closed.length) * 100) : 0
+		};
 	});
 </script>
 
@@ -118,25 +124,62 @@
 			</label>
 		{:else}
 			<div class="file-line">
-				<span class="file-name">{fileName}</span>
+				<span class="file-name" title={fileName}>{fileName}</span>
 				<span class="tag">{typeLabel}</span>
 				{#if result.statementCurrency}<span class="tag">{result.statementCurrency}</span>{/if}
-				{#if result.balanceRaw}<span class="tag">Баланс: {result.balanceRaw}</span>{/if}
-				{#if result.accountTitle}<span class="tag">{result.accountTitle}</span>{/if}
 			</div>
 
-			{#if closedStats}
-				<div class="stats">
-					<span>Извлечено <b>{closedStats.count}</b></span>
-					<span>закрытых <b>{closedStats.closed}</b></span>
-					<span>побед <b class="profit">{closedStats.wins}</b></span>
-					<span
-						>P/L <b class:profit={closedStats.profit >= 0} class:loss={closedStats.profit < 0}
-							>{formatMoney(closedStats.profit, currency, true)}</b
-						></span
-					>
+			<div class="meta">
+				<div class="meta-row">
+					{#if result.accountTitle}
+						<div class="cell grow">
+							<span class="label">Счёт</span>
+							<span class="value" title={result.accountTitle}>{result.accountTitle}</span>
+						</div>
+					{/if}
+					{#if result.balanceRaw}
+						<div class="cell">
+							<span class="label">Баланс</span>
+							<span class="value mono">{result.balanceRaw} {result.statementCurrency}</span>
+						</div>
+					{/if}
 				</div>
-			{/if}
+				{#if result.importAccountKind || result.importAccountServer || result.importAccountHedgeMode}
+					<div class="meta-row sub">
+						<div class="cell grow">
+							<span class="value dim mono">
+								{[result.importAccountKind, result.importAccountServer, result.importAccountHedgeMode]
+									.filter(Boolean)
+									.join(' · ')}
+							</span>
+						</div>
+					</div>
+				{/if}
+				{#if closedStats}
+					<div class="meta-row">
+						<div class="cell">
+							<span class="label">Извлечено</span>
+							<span class="value mono">{closedStats.count}</span>
+						</div>
+						<div class="cell">
+							<span class="label">Закрыто</span>
+							<span class="value mono">{closedStats.closed}</span>
+						</div>
+						<div class="cell">
+							<span class="label">Победы</span>
+							<span class="value mono profit">{closedStats.wins} · {closedStats.winrate}%</span>
+						</div>
+						<div class="cell">
+							<span class="label">P/L</span>
+							<span
+								class="value mono"
+								class:profit={closedStats.profit >= 0}
+								class:loss={closedStats.profit < 0}>{formatMoney(closedStats.profit, currency, true)}</span
+							>
+						</div>
+					</div>
+				{/if}
+			</div>
 
 			<div class="preview-wrap">
 				<table class="preview">
@@ -230,11 +273,16 @@
 		font-family: var(--font-mono);
 		font-size: 0.7rem;
 		margin-bottom: 0.7rem;
+		min-width: 0;
 	}
 	.file-name {
 		color: var(--ink);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.tag {
+		flex: none;
 		font-size: 0.66rem;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
@@ -243,21 +291,54 @@
 		border-radius: 2px;
 		color: var(--ink-muted);
 	}
-	.stats {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.9rem;
-		font-family: var(--font-mono);
-		font-size: 0.66rem;
-		color: var(--ink-muted);
-		padding: 0.5rem 0;
-		border-top: 1px solid var(--line);
-		border-bottom: 1px solid var(--line);
+	/* инфо-панель отчёта: ячейки с волосяными разделителями */
+	.meta {
+		border: 1px solid var(--line);
 		margin-bottom: 0.7rem;
 	}
-	.stats b {
-		font-weight: 400;
+	.meta-row {
+		display: flex;
+		align-items: stretch;
+	}
+	.meta-row + .meta-row {
+		border-top: 1px solid var(--line);
+	}
+	.cell {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		padding: 0.45rem 0.6rem;
+		min-width: 0;
+	}
+	.cell + .cell {
+		border-left: 1px solid var(--line);
+	}
+	.cell.grow {
+		flex: 1 1 auto;
+	}
+	.meta-row.sub .cell {
+		padding-top: 0.3rem;
+		padding-bottom: 0.3rem;
+	}
+	.label {
+		font-family: var(--font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--ink-muted);
+	}
+	.value {
+		font-size: 0.72rem;
 		color: var(--ink);
+		min-width: 0;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.value.dim {
+		color: var(--ink-muted);
+		font-size: 0.64rem;
 	}
 	.preview-wrap {
 		max-height: 320px;

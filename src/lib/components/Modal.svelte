@@ -147,7 +147,11 @@
 		position: fixed;
 		inset: 0;
 		z-index: 60;
-		background: var(--scrim);
+		/* точечный паттерн вместо сплошного фона (4px сетка) + мягкое осветление/блюр страницы под ним */
+		background-color: color-mix(in srgb, var(--scrim) 30%, transparent);
+		background-image: radial-gradient(transparent 1.5px, var(--scrim) 1.5px);
+		background-size: 10px 10px;
+		backdrop-filter: brightness(1.15) blur(8px) saturate(1.1);
 		display: grid;
 		place-items: center;
 		padding: 1.5rem;
