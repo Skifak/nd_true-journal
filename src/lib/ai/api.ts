@@ -4,6 +4,7 @@
  * (тело не логируется и не сохраняется в историю).
  */
 import type { ModelInfo, ThinkingLevel, Usage } from './types.ts';
+import { catalogForFamily } from './modelCatalog.ts';
 
 /** Дефолт endpoint'а — используется, когда Base URL пуст (плейсхолдер). */
 export const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
@@ -208,8 +209,21 @@ function buildBody(args: ChatArgs, stream: boolean): string {
 		stream
 	};
 	if (args.thinking) {
-		// OpenAI принимает low|medium|high; 'max' отправляем как есть — несовместимость отдаст провайдер.
-		body.reasoning_effort = args.thinking === 'max' && host === 'api.openai.com' ? 'high' : args.thinking;
+		// Уровень → провайдерское значение: у семейства из каталога своя карта и формат.
+		const cat = catalogForFamily(modelFamily(args.model));
+		if (cat?.reasoning) {
+			const lvl = args.thinking;
+			const mapped = cat.thinkingLevelMap?.[lvl];
+			if (cat.wire.kind === 'reasoning_effort') {
+				if (typeof mapped === 'string') body.reasoning_effort = mapped;
+				// max в OpenAI нет — ближайший 'high' (остальные семейства пропускают null как есть).
+				else if (lvl === 'max' && host === 'api.openai.com') body.reasoning_effort = 'high';
+				else if (typeof mapped === 'undefined') body.reasoning_effort = lvl;
+			}
+			// google_level / toggle / anthropic_budget — для OpenAI-compatible endpoint не отправляем:
+			// эти форматы у чат-completions не применяются, чей переход в api.ts при появлении
+			// нативных адаптеров Anthropic/Google.
+		}
 	}
 	return JSON.stringify(body);
 }

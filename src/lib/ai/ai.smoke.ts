@@ -124,5 +124,54 @@ eq('format bytes small', formatBytes(512), '512 Б');
 eq('format bytes kb', formatBytes(2048), '2.0 КБ');
 eq('format bytes mb', formatBytes(2 * 1024 * 1024), '2.0 МБ');
 
+// ── Уровни мышления (thinking.ts) ─────────────────────────────────────────
+import {
+	getSupportedThinkingLevels,
+	clampThinkingLevel,
+	effortThinkingLevelMap,
+	isThinkingLevel,
+	MODEL_THINKING_LEVELS
+} from './thinking.ts';
+import { catalogForFamily, MODEL_CATALOG } from './modelCatalog.ts';
+import { MemoryCredentialStore, findEnvKeys, providerIdForHost, PROVIDER_ENV_KEYS } from './credentials.ts';
+
+const openai = catalogForFamily('OpenAI o-серия')!;
+const claude = catalogForFamily('Claude')!;
+
+eq('levels off', getSupportedThinkingLevels({ reasoning: false }), ['off']);
+eq('levels openai', getSupportedThinkingLevels(openai), ['low', 'medium', 'high']); // off: null — нельзя выключить
+eq('levels claude', getSupportedThinkingLevels(claude), ['minimal', 'low', 'medium', 'high', 'max']);
+eq('clamp openai max→high', clampThinkingLevel(openai, 'max'), 'high');
+eq('clamp openai xhigh→high', clampThinkingLevel(openai, 'xhigh'), 'high');
+eq('clamp claude xhigh→max', clampThinkingLevel(claude, 'xhigh'), 'max');
+eq('clamp no-op', clampThinkingLevel(claude, 'high'), 'high');
+eq('isLevel', isThinkingLevel('medium') && !isThinkingLevel('off'), true);
+eq('effort map', effortThinkingLevelMap([{ type: 'effort', values: ['low', 'medium', 'high', 'none'] }]), {
+	off: 'none',
+	minimal: null,
+	low: 'low',
+	medium: 'medium',
+	high: 'high',
+	xhigh: null,
+	max: null
+});
+eq('effort map toggle', effortThinkingLevelMap([{ type: 'toggle' }]), undefined);
+eq('catalog all ordered', MODEL_CATALOG.length > 5, true);
+eq('off is in track', MODEL_THINKING_LEVELS[0], 'off');
+
+// Креденшлы
+const store = new MemoryCredentialStore();
+await store.modify('openai', async () => ({ type: 'api_key', key: 'sk-test' }));
+eq('cred read', (await store.read('openai'))?.type, 'api_key');
+eq('cred missing', await store.read('nope'), undefined);
+eq('cred list', (await store.list())[0].providerId, 'openai');
+await store.delete('openai');
+eq('cred deleted', await store.read('openai'), undefined);
+eq('env keys openai', findEnvKeys('openai', { OPENAI_API_KEY: 'x' }), ['OPENAI_API_KEY']);
+eq('env keys none', findEnvKeys('openai', {}), undefined);
+eq('host provider', providerIdForHost('api.openai.com'), 'openai');
+eq('host unknown', providerIdForHost('example.dev'), undefined);
+eq('env secrets not in provider table', JSON.stringify(PROVIDER_ENV_KEYS).includes('sk-'), false);
+
 console.log(`\nAI-смоук: ${pass} ok, ${fail} fail`);
 if (fail) process.exit(1);

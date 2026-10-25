@@ -13,7 +13,14 @@
 		refreshModels
 	} from '#lib/ai/store.svelte.ts';
 	import { modelFamily, providerTitle, supportsThinking, isAnthropicModel } from '#lib/ai/api.ts';
-	import type { ThinkingLevel } from '#lib/ai/types.ts';
+import { catalogForFamily } from '#lib/ai/modelCatalog.ts';
+import {
+	getSupportedThinkingLevels,
+	clampThinkingLevel,
+	MODEL_THINKING_LEVELS,
+	type ModelThinkingLevel
+} from '#lib/ai/thinking.ts';
+import type { ThinkingLevel } from '#lib/ai/types.ts';
 	import { providerIcon } from '#lib/ai/providerIcons.ts';
 
 	let open = $state(false);
@@ -58,11 +65,21 @@
 		return all.filter((r) => r.id.toLowerCase().includes(search) || r.fam.toLowerCase().includes(search));
 	});
 
-	const LEVELS: ThinkingLevel[] = ['low', 'medium', 'high', 'max'];
-	const LEVEL_LABEL: Record<ThinkingLevel, string> = {
+	/** Полный трек уровней; xhigh/max включаются, если их поддерживает семейство модели. */
+	const trackLevels = $derived.by<ModelThinkingLevel[]>(() => {
+		if (!selected) return ['off', 'low', 'medium', 'high', 'max'];
+		const cat = catalogForFamily(modelFamily(selected));
+		if (!cat?.reasoning) return ['off', 'low', 'medium', 'high', 'max'];
+		const supported = getSupportedThinkingLevels({ reasoning: cat.reasoning, thinkingLevelMap: cat.thinkingLevelMap });
+		return MODEL_THINKING_LEVELS.filter((l) => supported.includes(l));
+	});
+	const LEVEL_LABEL: Record<ModelThinkingLevel, string> = {
+		off: 'Off',
+		minimal: 'Min',
 		low: 'Low',
-		medium: 'Medium',
+		medium: 'Med',
 		high: 'High',
+		xhigh: 'XHigh',
 		max: 'Max'
 	};
 
@@ -74,12 +91,25 @@
 		return f.enabled && f.text.trim() ? (anth ? 'CLAUDE.md' : 'AGENT.md') : '—';
 	});
 
-	/** Заполненные ступени индикатора усилия. */
+	/** Заполненные ступени индикатора усилия (off = 0, т.е. ни одной). */
 	const filled = $derived.by(() => {
 		if (!thinking || thinkingSupport !== true) return 0;
-		const i = LEVELS.indexOf(thinking);
-		return i < 0 ? 0 : i + 1;
+		const i = trackLevels.indexOf(thinking);
+		return i < 0 ? 0 : i;
 	});
+
+	/** Смена уровня: off/повторный клик → null, иначе clamp к поддерживаемым семейством. */
+	function onLevel(lvl: ModelThinkingLevel) {
+		if (thinking === lvl || lvl === 'off') {
+			setThinking(null);
+			return;
+		}
+		const cat = selected ? catalogForFamily(modelFamily(selected)) : undefined;
+		const clamped = cat?.reasoning
+			? clampThinkingLevel({ reasoning: cat.reasoning, thinkingLevelMap: cat.thinkingLevelMap }, lvl)
+			: lvl;
+		setThinking(clamped as ThinkingLevel);
+	}
 
 	/** Семейство модели → ключ иконки. */
 	function glyphFam(id: string): string {
@@ -133,7 +163,7 @@
 		<span class="name">{selected ?? 'Выбрать модель'}</span>
 		{#if thinking && thinkingSupport === true}
 			<span class="effort" aria-hidden="true">
-				{#each LEVELS as lvl, i (lvl)}
+				{#each trackLevels as lvl, i (lvl)}
 					<span class="bar" class:fill={i < filled} style:height="{5 + i * 2.5}px"></span>
 				{/each}
 			</span>
@@ -246,22 +276,22 @@
 						{:else if thinkingSupport === true}
 							<span class="effort-label" aria-hidden="true">
 								<span class="effort">
-									{#each LEVELS as lvl, i (lvl)}
+									{#each trackLevels as lvl, i (lvl)}
 										<span class="bar" class:fill={i < filled} style:height="{5 + i * 2.5}px"></span>
 									{/each}
 								</span>
 								<span class="mono">Мышление</span>
 							</span>
 							<div class="levels" role="radiogroup" aria-label="Уровень мышления">
-								<span class="indicator" style:width={`calc((100% - 0.5rem) / ${LEVELS.length})`} style:transform={`translateX(${Math.max(0, LEVELS.indexOf(thinking ?? 'low')) * 100}%)`}></span>
-								{#each LEVELS as lvl (lvl)}
+								<span class="indicator" style:width={`calc((100% - 0.5rem) / ${trackLevels.length})`} style:transform={`translateX(${Math.max(0, trackLevels.indexOf(thinking ?? 'low')) * 100}%)`}></span>
+								{#each trackLevels as lvl (lvl)}
 									<button
 										type="button"
 										role="radio"
 										class="lvl"
 										class:active={thinking === lvl}
 										aria-checked={thinking === lvl}
-										onclick={() => setThinking(thinking === lvl ? null : lvl)}
+										onclick={() => onLevel(lvl)}
 									>
 										{LEVEL_LABEL[lvl]}
 									</button>
