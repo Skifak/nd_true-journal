@@ -28,6 +28,7 @@ import {
 } from './types.ts';
 import { clearKey, getKey, memoryHasKey, restoreKey, saveKey, type KeyPlace } from './keyStorage.ts';
 import { clearSessions, loadSessions, saveSessions } from './sessions.ts';
+import { loadModelsCache, saveModelsCache } from './modelsCache.ts';
 import { attachmentsToDataUrls, buildJournalContext, collectAttachmentIds } from './context.ts';
 import { parseStamp, uuid, type Trade } from '../domain/trades.ts';
 import { namespaced } from '../storage/local.ts';
@@ -109,7 +110,17 @@ export async function initAi(): Promise<void> {
 	// Возврат в приложение продолжает последнюю сессию, а не пустой чат.
 	if (sessions.length && !activeId) activeId = sessions[0].id;
 	keyReady = await restoreKey();
-	if (keyReady) keyPlace = 'device';
+	if (keyReady) {
+		keyPlace = 'device';
+		// Сначала кэш (список виден сразу, в т.ч. офлайн), затем обновление в фоне.
+		const cached = await loadModelsCache();
+		if (cached && (!cached.baseUrl || cached.baseUrl === effectiveBaseUrl())) {
+			models = cached.models;
+			modelsState = 'ok';
+			connNotice = String(cached.models.length);
+		}
+		void refreshModels();
+	}
 	ready = true;
 }
 
@@ -184,6 +195,7 @@ export async function probe(baseUrl: string, apiKey: string): Promise<number> {
 		const list = await fetchModels(baseUrl, apiKey);
 		models = list;
 		modelsState = 'ok';
+		await saveModelsCache({ baseUrl: normalizeBaseUrl(baseUrl), fetchedTs: Date.now(), models: list });
 		stagedKey = apiKey.trim();
 		if (settings.baseUrl !== baseUrl) settings.baseUrl = baseUrl;
 		connNotice = String(list.length);
@@ -216,9 +228,11 @@ export async function refreshModels(): Promise<void> {
 	modelsState = 'loading';
 	connError = null;
 	try {
-		models = await fetchModels(effectiveBaseUrl(), getKey());
+		const list = await fetchModels(effectiveBaseUrl(), getKey());
+		models = list;
 		modelsState = 'ok';
-		connNotice = String(models.length);
+		connNotice = String(list.length);
+		await saveModelsCache({ baseUrl: effectiveBaseUrl(), fetchedTs: Date.now(), models: list });
 	} catch (e) {
 		modelsState = 'error';
 		connError = e instanceof ApiError ? e : new ApiError(String(e), 0, '');
@@ -435,9 +449,16 @@ export async function send(
 	};
 
 	// История диалога — предыдущие сообщения сессии (ошибочные не resend-им).
-	const prior = (sessions.find((s) => s.id === sId)?.messages ?? [])
+	const history = (sessions.find((s) => s.id === sId)?.messages ?? [])
 		.filter((m) => m.id !== replyId && m.status !== 'error' && m.content)
 		.map((m) => ({ role: m.role, content: m.content }));
+	// Контекст журнала подмешивается в последнее сообщение запроса (в UI остаётся чистый промпт).
+	const contextBlock = contextText.trim()
+		? `Контекст журнала сделок:\n\n${contextText.trim()}\n\n---\n\n`
+		: '';
+	const prior = history.map((m, i) =>
+		i === history.length - 1 && m.role === 'user' ? { ...m, content: contextBlock + m.content } : m
+	);
 
 	// Системный файл: CLAUDE.md — моделям Anthropic, иначе AGENT.md.
 	const anthropic = isAnthropicModel(model);

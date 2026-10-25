@@ -4,7 +4,7 @@
  * картинками только vision-моделям).
  */
 import type { SectionKey } from './types.ts';
-import { tradeProfit, tradeSource, type Trade } from '../domain/trades.ts';
+import { tradeProfit, tradeSource, parseStamp, type Trade } from '../domain/trades.ts';
 import { getBlob } from '../storage/idb.ts';
 
 export interface ContextInput {
@@ -17,7 +17,11 @@ export interface ContextInput {
 /** Собрать текстовый контекст журнала по разрешённым разделам. */
 export function buildJournalContext(input: ContextInput): string {
 	const parts: string[] = [];
-	const { sections, trades, note } = input;
+	const { sections, note } = input;
+	// Хронологический порядок (старые → новые): нумерация [№] в контексте совпадает со временем.
+	const trades = [...input.trades].sort(
+		(a, b) => (parseStamp(a.dateOpen)?.getTime() ?? 0) - (parseStamp(b.dateOpen)?.getTime() ?? 0)
+	);
 
 	if (sections.has('trades') && trades.length) {
 		const lines = trades.map((t, i) => {

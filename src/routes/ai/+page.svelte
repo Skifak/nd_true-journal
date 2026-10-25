@@ -79,10 +79,12 @@
 	}
 
 	async function run(payload: SendPayload, text = '') {
+		const prev = input;
+		if (payload.kind === 'free') input = ''; // поле чистим сразу — не ждём конца генерации
 		try {
 			await send(getTrades(), dayNote(), payload, text);
-			if (payload.kind === 'free') input = '';
 		} catch (e) {
+			if (payload.kind === 'free') input = prev; // предусловия не прошли — возвращаем текст
 			notice = e instanceof Error ? e.message : String(e);
 		}
 	}

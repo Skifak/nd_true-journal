@@ -74,7 +74,13 @@ export function modelFamily(id: string): string {
 	if (/^llama|^meta-llama/.test(s)) return 'Llama';
 	if (/^mistral|^mixtral|^pixtral/.test(s)) return 'Mistral';
 	if (/^qwen/.test(s)) return 'Qwen';
-	if (/^glm/.test(s)) return 'GLM';
+	if (/^glm|^z-?ai/.test(s)) return 'GLM';
+	if (/kimi|moonshot/.test(s)) return 'Kimi';
+	if (/perplexity|^sonar/.test(s)) return 'Perplexity';
+	if (/copilot/.test(s)) return 'Copilot';
+	if (/manus/.test(s)) return 'Manus';
+	if (/yandex|^yagpt/.test(s)) return 'Yandex';
+	if (/antigravity/.test(s)) return 'Antigravity';
 	return 'Другие';
 }
 
