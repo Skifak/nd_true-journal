@@ -17,6 +17,7 @@ import {
 } from './api.ts';
 import { buildJournalContext, collectAttachmentIds } from './context.ts';
 import { formatBytes, historyStats } from './sessions.ts';
+import { isCacheUsable, MODELS_TTL_MS, type ModelsCache } from './modelsCache.ts';
 import { normalizeTrade, type Trade } from '../domain/trades.ts';
 
 let pass = 0,
@@ -176,6 +177,20 @@ eq('env keys none', findEnvKeys('openai', {}), undefined);
 eq('host provider', providerIdForHost('api.openai.com'), 'openai');
 eq('host unknown', providerIdForHost('example.dev'), undefined);
 eq('env secrets not in provider table', JSON.stringify(PROVIDER_ENV_KEYS).includes('sk-'), false);
+
+// Кэш моделей: свежий используется без запроса, устаревший/чужой — нет.
+const now = 1_000_000_000_000;
+const mkCache = (over: Partial<ModelsCache> = {}): ModelsCache => ({
+	baseUrl: 'https://api.openai.com/v1',
+	fetchedTs: now - 1000,
+	models: [{ id: 'gpt-4o', pricing: null }],
+	...over
+});
+eq('cache fresh usable', isCacheUsable(mkCache(), 'https://api.openai.com/v1', now), true);
+eq('cache stale rejected', isCacheUsable(mkCache({ fetchedTs: now - MODELS_TTL_MS - 1 }), 'https://api.openai.com/v1', now), false);
+eq('cache other host rejected', isCacheUsable(mkCache(), 'https://openrouter.ai/api/v1', now), false);
+eq('cache empty rejected', isCacheUsable(mkCache({ models: [] }), 'https://api.openai.com/v1', now), false);
+eq('cache null rejected', isCacheUsable(null, 'https://api.openai.com/v1', now), false);
 
 console.log(`\nAI-смоук: ${pass} ok, ${fail} fail`);
 if (fail) process.exit(1);

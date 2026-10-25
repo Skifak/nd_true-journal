@@ -230,14 +230,14 @@ import type { ThinkingLevel } from '#lib/ai/types.ts';
 							type="button"
 							class="refresh"
 							disabled={aiState.modelsState === 'loading'}
-							onclick={refreshModels}
+							onclick={() => refreshModels(true)}
 							title="Обновить список моделей"
 						>
 							{aiState.modelsState === 'loading' ? '…' : '↻'}
 						</button>
 					</div>
 
-					{#if aiState.modelsState === 'error'}
+					{#if aiState.modelsState === 'error' && !aiState.models.length}
 						<p class="empty">Не удалось получить модели. Проверьте подключение.</p>
 					{:else if !rows.length}
 						<p class="empty">{searching ? `Нет совпадений «${query.trim()}»` : 'Список моделей пуст'}</p>

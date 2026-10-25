@@ -18,6 +18,23 @@ export interface ModelsCache {
 	models: ModelInfo[];
 }
 
+/** Срок жизни кэша: в его пределах сеть не трогаем. */
+export const MODELS_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Годится ли кэш для текущего endpoint'а: непустой, тот же Base URL и не старше TTL.
+ * Пустой baseUrl в кэше — «любой endpoint» (старые записи без привязки).
+ */
+export function isCacheUsable(
+	cache: ModelsCache | null,
+	baseUrl: string,
+	now = Date.now()
+): cache is ModelsCache {
+	if (!cache || !cache.models.length) return false;
+	if (cache.baseUrl && cache.baseUrl !== baseUrl) return false;
+	return now - cache.fetchedTs <= MODELS_TTL_MS;
+}
+
 export async function loadModelsCache(): Promise<ModelsCache | null> {
 	if (isTauri()) {
 		try {

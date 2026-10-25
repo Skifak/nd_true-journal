@@ -28,7 +28,7 @@ import {
 } from './types.ts';
 import { clearKey, getKey, memoryHasKey, restoreKey, saveKey, type KeyPlace } from './keyStorage.ts';
 import { clearSessions, loadSessions, saveSessions } from './sessions.ts';
-import { loadModelsCache, saveModelsCache } from './modelsCache.ts';
+import { isCacheUsable, loadModelsCache, saveModelsCache } from './modelsCache.ts';
 import { attachmentsToDataUrls, buildJournalContext, collectAttachmentIds } from './context.ts';
 import { parseStamp, uuid, type Trade } from '../domain/trades.ts';
 import { namespaced } from '../storage/local.ts';
@@ -112,14 +112,15 @@ export async function initAi(): Promise<void> {
 	keyReady = await restoreKey();
 	if (keyReady) {
 		keyPlace = 'device';
-		// Сначала кэш (список виден сразу, в т.ч. офлайн), затем обновление в фоне.
+		// Кэш поднимаем сразу; сеть дёргаем только если он устарел или отсутствует.
 		const cached = await loadModelsCache();
-		if (cached && (!cached.baseUrl || cached.baseUrl === effectiveBaseUrl())) {
+		if (isCacheUsable(cached, effectiveBaseUrl())) {
 			models = cached.models;
 			modelsState = 'ok';
 			connNotice = String(cached.models.length);
+		} else {
+			void refreshModels();
 		}
-		void refreshModels();
 	}
 	ready = true;
 }
@@ -223,9 +224,13 @@ export async function persistKey(place: KeyPlace): Promise<void> {
 }
 
 /** Обновить список моделей текущим ключом (кнопка «Обновить»). */
-export async function refreshModels(): Promise<void> {
+export async function refreshModels(force = false): Promise<void> {
 	if (!memoryHasKey()) return;
-	modelsState = 'loading';
+	if (!force && isCacheUsable(await loadModelsCache(), effectiveBaseUrl())) {
+		return; // кэш свежий — лишний запрос не нужен
+	}
+	// При уже загруженном списке не показываем «пусто»: обновление идёт в фоне.
+	if (!models.length) modelsState = 'loading';
 	connError = null;
 	try {
 		const list = await fetchModels(effectiveBaseUrl(), getKey());
