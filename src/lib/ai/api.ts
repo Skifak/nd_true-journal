@@ -92,13 +92,17 @@ export function isAnthropicModel(id: string): boolean {
 
 /**
  * Поддержка выбора уровня мышления: true/false — известно, null — неизвестно.
+ * Сначала каталог семейств (reasoning + карта), затем эвристики по имени.
  * Имя модели не доказывает возможности endpoint'а, поэтому неизвестное — не угадываем.
  */
 export function supportsThinking(id: string): boolean | null {
 	const s = id.toLowerCase();
+	// Явно не-мышлящие имена не перекрываются каталогом семейств (gpt-4o в семействе GPT).
+	if (/^(gpt-4|chatgpt|deepseek-chat|llama|mistral|mixtral|qwen)/.test(s)) return false;
+	const cat = catalogForFamily(modelFamily(id));
+	if (cat) return cat.reasoning;
 	if (/^(o[134]|gpt-5)/.test(s)) return true;
 	if (/^grok-[34]/.test(s)) return true;
-	if (/^(gpt-4|chatgpt|deepseek-chat|llama|mistral|mixtral|qwen)/.test(s)) return false;
 	return null;
 }
 
