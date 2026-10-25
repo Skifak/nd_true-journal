@@ -4,7 +4,7 @@
  * (тело не логируется и не сохраняется в историю).
  */
 import type { ModelInfo, ThinkingLevel, Usage } from './types.ts';
-import { catalogForFamily } from './modelCatalog.ts';
+import { catalogForModel } from './modelCatalog.ts';
 
 /** Дефолт endpoint'а — используется, когда Base URL пуст (плейсхолдер). */
 export const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
@@ -99,7 +99,7 @@ export function supportsThinking(id: string): boolean | null {
 	const s = id.toLowerCase();
 	// Явно не-мышлящие имена не перекрываются каталогом семейств (gpt-4o в семействе GPT).
 	if (/^(gpt-4|chatgpt|deepseek-chat|llama|mistral|mixtral|qwen)/.test(s)) return false;
-	const cat = catalogForFamily(modelFamily(id));
+	const cat = catalogForModel(id);
 	if (cat) return cat.reasoning;
 	if (/^(o[134]|gpt-5)/.test(s)) return true;
 	if (/^grok-[34]/.test(s)) return true;
@@ -214,7 +214,7 @@ function buildBody(args: ChatArgs, stream: boolean): string {
 	};
 	if (args.thinking) {
 		// Уровень → провайдерское значение: у семейства из каталога своя карта и формат.
-		const cat = catalogForFamily(modelFamily(args.model));
+		const cat = catalogForModel(args.model);
 		if (cat?.reasoning) {
 			const lvl = args.thinking;
 			const mapped = cat.thinkingLevelMap?.[lvl];

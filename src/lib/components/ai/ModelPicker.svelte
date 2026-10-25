@@ -13,7 +13,7 @@
 		refreshModels
 	} from '#lib/ai/store.svelte.ts';
 	import { modelFamily, providerTitle, supportsThinking, isAnthropicModel } from '#lib/ai/api.ts';
-import { catalogForFamily } from '#lib/ai/modelCatalog.ts';
+import { catalogForModel } from '#lib/ai/modelCatalog.ts';
 import {
 	getSupportedThinkingLevels,
 	clampThinkingLevel,
@@ -68,7 +68,7 @@ import type { ThinkingLevel } from '#lib/ai/types.ts';
 	/** Полный трек уровней; xhigh/max включаются, если их поддерживает семейство модели. */
 	const trackLevels = $derived.by<ModelThinkingLevel[]>(() => {
 		if (!selected) return ['off', 'low', 'medium', 'high', 'max'];
-		const cat = catalogForFamily(modelFamily(selected));
+		const cat = catalogForModel(selected);
 		if (!cat?.reasoning) return ['off', 'low', 'medium', 'high', 'max'];
 		const supported = getSupportedThinkingLevels({ reasoning: cat.reasoning, thinkingLevelMap: cat.thinkingLevelMap });
 		return MODEL_THINKING_LEVELS.filter((l) => supported.includes(l));
@@ -104,7 +104,7 @@ import type { ThinkingLevel } from '#lib/ai/types.ts';
 			setThinking(null);
 			return;
 		}
-		const cat = selected ? catalogForFamily(modelFamily(selected)) : undefined;
+		const cat = selected ? catalogForModel(selected) : undefined;
 		const clamped = cat?.reasoning
 			? clampThinkingLevel({ reasoning: cat.reasoning, thinkingLevelMap: cat.thinkingLevelMap }, lvl)
 			: lvl;

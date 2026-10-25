@@ -4,6 +4,7 @@
  * Unknown-модели остаются unknown: не угадываем (см. supportsThinking в api.ts).
  */
 import type { ThinkingLevelMap } from './thinking.ts';
+import { modelFamily } from './api.ts';
 
 /** Как передать уровень провайдеру. */
 export type Wire =
@@ -109,4 +110,21 @@ export const MODEL_CATALOG: FamilyCatalog[] = [
 
 export function catalogForFamily(family: string): FamilyCatalog | undefined {
 	return MODEL_CATALOG.find((c) => c.family === family);
+}
+
+/**
+ * По-модельные переопределения: семейный каталог не знает исключений внутри семейства
+ * (flash-варианты и т.п.). Совпадение по id → готовый ответ вместо семейного каталога.
+ * Уточняется по мере находок; модель не из списка — считаем по семейству.
+ */
+const MODEL_OVERRIDES: { pattern: RegExp; catalog: FamilyCatalog | null }[] = [
+	// GLM flash-варианты без мышления
+	{ pattern: /^glm.*flash/i, catalog: { family: 'GLM (flash)', reasoning: false, wire: { kind: 'toggle' } } }
+];
+
+/** Каталог для конкретной модели: переопределение по id → семейство → undefined. */
+export function catalogForModel(id: string): FamilyCatalog | undefined {
+	const hit = MODEL_OVERRIDES.find((o) => o.pattern.test(id));
+	if (hit) return hit.catalog ?? undefined;
+	return catalogForFamily(modelFamily(id));
 }

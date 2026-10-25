@@ -56,6 +56,8 @@ eq('thinking gpt-4o', supportsThinking('gpt-4o'), false);
 eq('thinking unknown', supportsThinking('some-proxy-model'), null);
 eq('thinking gpt-6-luna', supportsThinking('gpt-6-luna'), true);
 eq('thinking gpt-4o всё ещё false', supportsThinking('gpt-4o'), false);
+eq('thinking glm flash false', supportsThinking('glm-5.3-flash'), false);
+eq('thinking glm обычный true', supportsThinking('glm-5'), true);
 eq('vision gpt-4o', supportsVision('gpt-4o'), 'yes');
 eq('vision claude', supportsVision('claude-opus-4'), 'yes');
 eq('vision gpt-3.5', supportsVision('gpt-3.5-turbo'), 'no');
