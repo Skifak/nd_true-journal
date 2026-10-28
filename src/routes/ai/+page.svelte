@@ -156,7 +156,7 @@
 
 			<section class="chat">
 				<header class="chat-head">
-					<ModelPicker />
+					<ModelPicker session />
 					{#if session}
 						<span class="title">{session.title}</span>
 					{/if}

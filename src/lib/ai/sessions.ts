@@ -73,6 +73,7 @@ function normalize(data: unknown): ChatSession[] {
 			id: String(s.id),
 			title: String(s.title || 'Сессия'),
 			createdTs: Number(s.createdTs) || Date.now(),
+			model: typeof s.model === 'string' ? s.model : null,
 			messages: Array.isArray(s.messages)
 				? s.messages.map((m) => ({
 						id: String(m.id),

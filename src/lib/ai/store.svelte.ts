@@ -61,6 +61,7 @@ function loadSettings(): AiSettings {
 let settings = $state<AiSettings>(loadSettings());
 let sessions = $state<ChatSession[]>([]);
 let activeId = $state<string | null>(null);
+let pendingSessionModel = $state<string | null>(null);
 
 let keyReady = $state(false);
 let keyPlace = $state<KeyPlace>(null);
@@ -171,11 +172,15 @@ export const aiState = {
 	get activeSession() {
 		return sessions.find((s) => s.id === activeId) ?? null;
 	},
+	get currentModel(): string | null {
+		return sessions.find((s) => s.id === activeId)?.model ?? pendingSessionModel ?? settings.model;
+	},
 	/** Выбранная модель есть в текущем списке поставщика. */
 	get modelAvailable(): boolean {
-		if (!settings.model) return false;
+		const model = sessions.find((s) => s.id === activeId)?.model ?? pendingSessionModel ?? settings.model;
+		if (!model) return false;
 		if (!models.length) return true; // список ещё не получен — не блокируем
-		return models.some((m) => m.id === settings.model);
+		return models.some((m) => m.id === model);
 	}
 };
 
@@ -254,6 +259,16 @@ export function setModel(id: string | null): void {
 	settings.model = id;
 }
 
+/** Модель текущей сессии; новая сессия использует модель из настроек. */
+export function setSessionModel(id: string | null): void {
+	if (!activeId) {
+		pendingSessionModel = id;
+		return;
+	}
+	sessions = sessions.map((s) => (s.id === activeId ? { ...s, model: id } : s));
+	scheduleHistorySave();
+}
+
 export function setThinking(level: ThinkingLevel | null): void {
 	settings.thinking = level;
 }
@@ -303,6 +318,7 @@ export async function forgetKey(): Promise<void> {
 
 export function selectSession(id: string | null): void {
 	activeId = id;
+	if (id) pendingSessionModel = null;
 }
 
 export function renameSession(id: string, title: string): void {
@@ -386,7 +402,8 @@ export async function send(
 ): Promise<void> {
 	if (generating) throw new Error('Уже идёт генерация');
 	if (!keyReady || !memoryHasKey()) throw new Error('Нет подключённого ключа');
-	const model = settings.model;
+	const activeSession = sessions.find((s) => s.id === activeId) ?? null;
+	const model = activeSession?.model ?? pendingSessionModel ?? settings.model;
 	if (!model) throw new Error('Модель не выбрана');
 
 	lastError = null;
@@ -421,6 +438,7 @@ export async function send(
 			id: uuid(),
 			title: prompt.slice(0, 60) + (prompt.length > 60 ? '…' : ''),
 			createdTs: now,
+			model,
 			messages: []
 		};
 		sessions = [session, ...sessions];

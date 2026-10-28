@@ -88,6 +88,8 @@ export interface ChatSession {
 	id: string;
 	title: string;
 	createdTs: number;
+	/** Модель этой сессии; отсутствие означает модель по умолчанию из настроек. */
+	model?: string | null;
 	messages: ChatMessage[];
 }
 

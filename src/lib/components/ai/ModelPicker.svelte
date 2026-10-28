@@ -9,6 +9,7 @@
 		aiState,
 		effectiveBaseUrl,
 		setModel,
+		setSessionModel,
 		setThinking,
 		refreshModels
 	} from '#lib/ai/store.svelte.ts';
@@ -23,13 +24,15 @@ import {
 import type { ThinkingLevel } from '#lib/ai/types.ts';
 	import { providerIcon } from '#lib/ai/providerIcons.ts';
 
+	let { session = false }: { session?: boolean } = $props();
+
 	let open = $state(false);
 	let query = $state('');
 	let searchEl = $state<HTMLInputElement | null>(null);
 	let popupEl = $state<HTMLDivElement | null>(null);
 
 	const providerTitleText = $derived(providerTitle(effectiveBaseUrl()));
-	const selected = $derived(aiState.settings.model);
+	const selected = $derived(session ? aiState.currentModel : aiState.settings.model);
 	const thinking = $derived(aiState.settings.thinking);
 
 	type Row = { id: string; fam: string };
@@ -133,7 +136,11 @@ import type { ThinkingLevel } from '#lib/ai/types.ts';
 	}
 
 	function pick(id: string) {
-		setModel(id);
+		if (session) {
+			setSessionModel(id);
+		} else {
+			setModel(id);
+		}
 		open = false;
 	}
 
