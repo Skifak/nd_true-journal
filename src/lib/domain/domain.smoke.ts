@@ -13,6 +13,7 @@ try {
 
 import { calculateProfit, tradeProfit, calculatePips, normalizeTrade, formatMoney, formatDuration, dayKey, type Trade } from './trades.ts';
 import { filterTrades, sortTrades, computeTotals, groupByDay, equityCurve, emptyFilters } from './journal.ts';
+import { primaryKillzone, byKillzone } from './killzones.ts';
 import { parseMt5Report, parseNumber, parseMt5Date, decodeMt5Html } from './mt5.ts';
 
 let pass = 0, fail = 0;
@@ -139,6 +140,24 @@ for (const ch of src) {
 }
 eq('decode utf16 bom', decodeMt5Html(new Uint8Array(u16).buffer), src);
 eq('decode utf8', decodeMt5Html(enc.encode('<html>ok</html>').buffer), '<html>ok</html>');
+
+// Killzone: UTC-окна. Метки строим из UTC-инстанта, чтобы тест не зависел от таймзоны машины
+const stampFromUtc = (h: number, mi: number) => {
+	const d = new Date(Date.UTC(2026, 0, 5, h, mi));
+	const p = (n: number) => String(n).padStart(2, '0');
+	return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:00`;
+};
+eq('kz london', primaryKillzone(stampFromUtc(7, 30))?.id, 'london');
+eq('kz asian (wrap)', primaryKillzone(stampFromUtc(1, 30))?.id, 'asian');
+eq('kz out', primaryKillzone(stampFromUtc(17, 0)), null);
+const kzTrades = [
+	{ id: '1', dateOpen: stampFromUtc(7, 30), status: 'closed', profit: 100 },
+	{ id: '2', dateOpen: stampFromUtc(17, 0), status: 'closed', profit: -30 }
+] as never;
+eq('kz rows', byKillzone(kzTrades), [
+	{ id: 'london', label: 'Лондонская KZ', pnl: 100, count: 1, wins: 1 },
+	{ id: 'out', label: 'Вне KZ', pnl: -30, count: 1, wins: 0 }
+]);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
