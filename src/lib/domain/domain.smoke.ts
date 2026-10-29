@@ -1,10 +1,7 @@
-// DOMParser нужен парсеру MT5; в Node его нет — подставляем из happy-dom,
-// если пакет доступен (он есть в соседнем trader-journal).
+// DOMParser нужен парсеру MT5; в Node его нет — подставляем из happy-dom (dev-зависимость).
 try {
 	if (typeof globalThis.DOMParser === 'undefined') {
-		const { Window } = await import(
-			'/home/an/Projects/TradeJornalApp/trader-journal/node_modules/happy-dom/lib/index.js'
-		);
+		const { Window } = await import('happy-dom');
 		(globalThis as { DOMParser?: unknown }).DOMParser = new (Window as any)().DOMParser;
 	}
 } catch {
