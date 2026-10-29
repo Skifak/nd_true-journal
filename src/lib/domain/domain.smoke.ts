@@ -1,10 +1,7 @@
-// DOMParser нужен парсеру MT5; в Node его нет — подставляем из happy-dom,
-// если пакет доступен (он есть в соседнем trader-journal).
+// DOMParser нужен парсеру MT5; в Node его нет — подставляем из happy-dom (dev-зависимость).
 try {
 	if (typeof globalThis.DOMParser === 'undefined') {
-		const { Window } = await import(
-			'/home/an/Projects/TradeJornalApp/trader-journal/node_modules/happy-dom/lib/index.js'
-		);
+		const { Window } = await import('happy-dom');
 		(globalThis as { DOMParser?: unknown }).DOMParser = new (Window as any)().DOMParser;
 	}
 } catch {
@@ -219,9 +216,10 @@ const up2 = upsertDayEntry([day1], {at:'2026-01-07 21:30:00'});
 eq('day upsert new', up2.id, undefined);
 eq('day upsert new stamps', up2.at, '2026-01-07 00:00:00');
 
-const tA = normalizeTrade({id:'t1',pair:'EURUSD',direction:'long',volume:1,priceOpen:1.1,priceClose:1.105,status:'closed',dateOpen:'2026-01-05 09:00:00',dateClose:'2026-01-05 11:00:00'});
-const tB = normalizeTrade({id:'t2',pair:'EURUSD',direction:'short',volume:1,priceOpen:1.1,priceClose:1.103,status:'closed',dateOpen:'2026-01-05 14:00:00',dateClose:'2026-01-05 15:00:00'});
-const tC = normalizeTrade({id:'t3',pair:'XAUUSD',direction:'long',volume:0.1,priceOpen:2000,status:'open',dateOpen:'2026-01-07 02:00:00'});
+// Метки в UTC через Z — чтобы killzone и день не зависели от таймзоны машины (CI = UTC).
+const tA = normalizeTrade({id:'t1',pair:'EURUSD',direction:'long',volume:1,priceOpen:1.1,priceClose:1.105,status:'closed',dateOpen:'2026-01-05T08:30:00Z',dateClose:'2026-01-05T09:30:00Z'});
+const tB = normalizeTrade({id:'t2',pair:'EURUSD',direction:'short',volume:1,priceOpen:1.1,priceClose:1.103,status:'closed',dateOpen:'2026-01-05T13:30:00Z',dateClose:'2026-01-05T14:30:00Z'});
+const tC = normalizeTrade({id:'t3',pair:'XAUUSD',direction:'long',volume:0.1,priceOpen:2000,status:'open',dateOpen:'2026-01-07T12:00:00Z'});
 eq('killzone london', killzoneOf('2026-01-05T09:00:00Z'), 'Лондон');
 eq('killzone ny', killzoneOf('2026-01-05T14:00:00Z'), 'Нью-Йорк');
 eq('killzone asia', killzoneOf('2026-01-07T02:00:00Z'), 'Азия');
@@ -233,7 +231,7 @@ eq('day totals closed', dayTot.closed, 2);
 eq('day totals wins', dayTot.wins, 1);
 eq('day totals losses', dayTot.losses, 1);
 eq('day totals linked', dayTot.linkedCount, 1);
-eq('day totals killzones', dayTot.killzones, ['Азия','Лондон']);
+eq('day totals killzones', dayTot.killzones, ['Лондон','Нью-Йорк']);
 eq('day totals empty day', dayTotals([tA], '2026-02-01'), {profit:0,count:0,closed:0,wins:0,losses:0,killzones:[],linkedCount:0});
 
 // Шкалы по дням рядом с P/L
