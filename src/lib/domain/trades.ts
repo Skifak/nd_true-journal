@@ -327,6 +327,11 @@ export function formatMoney(value: unknown, currency = 'USD', signed = false): s
 export function parseStamp(value: unknown): Date | null {
 	if (!value) return null;
 	const s = String(value).trim().replace(' ', 'T');
+	// Дата-только 'YYYY-MM-DD' JS парсит как UTC-полночь — приводим к локальной, чтобы день не уезжал на сутки назад в западных таймзонах.
+	if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+		const [y, m, day] = s.split('-').map(Number);
+		return new Date(y, m - 1, day);
+	}
 	const d = new Date(s);
 	if (!Number.isFinite(d.getTime())) {
 		// MT5: '2026.01.05 10:00:00'
