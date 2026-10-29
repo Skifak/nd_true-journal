@@ -5,7 +5,7 @@
  * Запись дневника — самостоятельная сущность (не комментарий к сделке).
  * Связь со сделками — только списком id (многие-ко-многим), опциональная.
  */
-import { dayKey, nowStamp, uuid } from './trades.ts';
+import { dayKey, nowStamp, parseStamp, tradeProfit, uuid, type Trade } from './trades.ts';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Типы записей
@@ -55,7 +55,24 @@ export interface DiaryEntry {
 	followedPlan: boolean | null;
 	/** Связанные сделки (id из журнала), многие-ко-многим, опционально. */
 	tradeIds: string[];
+	/** «Разбор дня»: утренний план перед сессией. Пусто у прочих типов. */
+	dayPlan: string;
+	/** «Разбор дня»: вечерний итог. Пусто у прочих типов. */
+	dayResult: string;
+	/** «Разбор дня»: главная ошибка дня. */
+	mainMistake: string;
+	/** «Разбор дня»: соблюдал чек-лист входа. null — не отмечено. */
+	checklist: ChecklistAnswer | null;
 }
+
+/** Соблюдение чек-листа входа в «Разборе дня». */
+export type ChecklistAnswer = 'yes' | 'partial' | 'no';
+
+export const CHECKLIST_OPTIONS: { id: ChecklistAnswer; label: string }[] = [
+	{ id: 'yes', label: 'Да' },
+	{ id: 'partial', label: 'Частично' },
+	{ id: 'no', label: 'Нет' }
+];
 
 function clampScore(value: unknown): number | null {
 	if (value == null || value === '') return null;
@@ -79,9 +96,17 @@ export function normalizeEntry(raw: unknown): DiaryEntry {
 		discipline: clampScore(e.discipline),
 		calm: clampScore(e.calm),
 		followedPlan: typeof e.followedPlan === 'boolean' ? e.followedPlan : null,
-		tradeIds: Array.isArray(e.tradeIds) ? [...new Set(e.tradeIds.map(String).filter(Boolean))] : []
+		tradeIds: Array.isArray(e.tradeIds) ? [...new Set(e.tradeIds.map(String).filter(Boolean))] : [],
+		dayPlan: String(e.dayPlan ?? ''),
+		dayResult: String(e.dayResult ?? ''),
+		mainMistake: String(e.mainMistake ?? ''),
+		checklist: CHECKLIST_IDS.includes(e.checklist as ChecklistAnswer)
+			? (e.checklist as ChecklistAnswer)
+			: null
 	};
 }
+
+const CHECKLIST_IDS = CHECKLIST_OPTIONS.map((o) => o.id);
 
 export function createEntry(patch: Partial<DiaryEntry> = {}): DiaryEntry {
 	return normalizeEntry({ id: uuid(), kind: 'note', at: nowStamp(), text: '', ...patch });
@@ -122,7 +147,9 @@ export function emptyDiaryFilters(): DiaryFilters {
 }
 
 function haystack(e: DiaryEntry): string {
-	return [e.text, e.mistakeWhat, e.mistakeWhy, e.mistakeFix, ...e.tags].join(' ').toLowerCase();
+	return [e.text, e.mistakeWhat, e.mistakeWhy, e.mistakeFix, e.dayPlan, e.dayResult, e.mainMistake, ...e.tags]
+		.join(' ')
+		.toLowerCase();
 }
 
 export function filterEntries(entries: DiaryEntry[], f: DiaryFilters): DiaryEntry[] {
@@ -174,4 +201,229 @@ export function tagsInUse(entries: DiaryEntry[]): string[] {
 	const used = new Set<string>();
 	for (const e of entries) for (const t of e.tags) used.add(t);
 	return [...used].sort((a, b) => a.localeCompare(b, 'ru'));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// «Разбор дня»: одна запись на день + авто-итоги из сделок
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Разбор дня для конкретного дня: существующий или новая пустая запись.
+ * Одна на день — утренний план и вечерний итог живут в ней же.
+ */
+export function dayEntry(entries: DiaryEntry[], day: string): DiaryEntry | null {
+	const list = entries.filter((e) => e.kind === 'day' && dayKey(e.at) === day);
+	return list.length ? sortEntries(list)[0] : null;
+}
+
+/** Сохранить разбор дня: обновляет запись дня или создаёт её (одна на день). */
+export function upsertDayEntry(entries: DiaryEntry[], patch: Partial<DiaryEntry>): Partial<DiaryEntry> {
+	const day = dayKey(patch.at) ?? dayKey(nowStamp()) ?? '';
+	const existing = dayEntry(entries, day);
+	return { ...patch, kind: 'day', at: `${day} 00:00:00`, ...(existing ? { id: existing.id } : {}) };
+}
+
+/** Сделки одного дня: по закрытию, иначе по открытию. */
+export function tradesOfDay(trades: Trade[], day: string): Trade[] {
+	return trades.filter((t) => dayKey(t.dateClose || t.dateOpen) === day);
+}
+
+/** Killzone по часу входа сделки (UTC). Границы условные: у разных брокеров свои сессии. */
+export const KILLZONES: { id: string; label: string; from: number; to: number }[] = [
+	{ id: 'asia', label: 'Азия', from: 0, to: 8 },
+	{ id: 'london', label: 'Лондон', from: 8, to: 12 },
+	{ id: 'overlap', label: 'Лондон × Нью-Йорк', from: 12, to: 13 },
+	{ id: 'newyork', label: 'Нью-Йорк', from: 13, to: 17 },
+	{ id: 'late', label: 'Поздняя сессия', from: 17, to: 24 }
+];
+
+export function killzoneOf(at: string): string | null {
+	const d = parseStamp(at);
+	if (!d) return null;
+	const h = d.getUTCHours();
+	return (KILLZONES.find((k) => h >= k.from && h < k.to) ?? KILLZONES[KILLZONES.length - 1]).label;
+}
+
+export interface DayTotals {
+	/** Итоговый P/L дня по закрытым сделкам. */
+	profit: number;
+	/** Всего сделок за день (открытые тоже). */
+	count: number;
+	closed: number;
+	wins: number;
+	losses: number;
+	/** Killzone, в которых были входы, по убыванию числа сделок. */
+	killzones: string[];
+	/** Сделки, привязанные вручную (для подписи в разборе). */
+	linkedCount: number;
+}
+
+/** Авто-итоги дня из журнала сделок — не вводятся руками. */
+export function dayTotals(trades: Trade[], day: string, linkedIds: string[] = []): DayTotals {
+	const list = tradesOfDay(trades, day);
+	const acc: DayTotals = {
+		profit: 0,
+		count: list.length,
+		closed: 0,
+		wins: 0,
+		losses: 0,
+		killzones: [],
+		linkedCount: 0
+	};
+	const zones = new Map<string, number>();
+	const linked = new Set(linkedIds);
+	for (const t of list) {
+		if (linked.has(t.id)) acc.linkedCount++;
+		const zone = killzoneOf(t.dateOpen);
+		if (zone) zones.set(zone, (zones.get(zone) ?? 0) + 1);
+		if (t.status !== 'closed') continue;
+		const p = tradeProfit(t);
+		acc.closed++;
+		acc.profit += p;
+		if (p > 0) acc.wins++;
+		else if (p < 0) acc.losses++;
+	}
+	acc.profit = Number(acc.profit.toFixed(2));
+	acc.killzones = [...zones.entries()].sort((a, b) => b[1] - a[1]).map(([z]) => z);
+	return acc;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Статистика дневника: шкалы по дням, топ ошибок, средние по дням недели
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Метка дня недели Пн..Вс и её номер для сортировки. */
+const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+export interface DayScore {
+	day: string;
+	/** 'Пн'..'Вс' */
+	weekday: string;
+	/** Среднее по записям дня; null — шкалу в этот день не ставили. */
+	discipline: number | null;
+	calm: number | null;
+	/** P/L дня по закрытым сделкам. */
+	profit: number;
+	/** Сделок за день. */
+	count: number;
+}
+
+function avg(values: number[]): number | null {
+	if (!values.length) return null;
+	return Number((values.reduce((s, v) => s + v, 0) / values.length).toFixed(2));
+}
+
+/**
+ * Шкалы дневника по дням рядом с P/L дня.
+ * Дни — те, где есть записи дневника или сделки в пределах периода.
+ */
+export function dayScores(entries: DiaryEntry[], trades: Trade[], since?: number): DayScore[] {
+	const byDay = new Map<string, { discipline: number[]; calm: number[] }>();
+	for (const e of entries) {
+		const key = dayKey(e.at);
+		if (!key) continue;
+		const bucket = byDay.get(key) ?? { discipline: [], calm: [] };
+		if (e.discipline != null) bucket.discipline.push(e.discipline);
+		if (e.calm != null) bucket.calm.push(e.calm);
+		byDay.set(key, bucket);
+	}
+	const profits = new Map<string, { profit: number; count: number }>();
+	for (const t of trades) {
+		const key = dayKey(t.dateClose || t.dateOpen);
+		if (!key) continue;
+		const bucket = profits.get(key) ?? { profit: 0, count: 0 };
+		bucket.count++;
+		// P/L дня — как в KPI дашборда: сумма по всем сделкам дня
+		bucket.profit += tradeProfit(t);
+		profits.set(key, bucket);
+	}
+	const keys = new Set([...byDay.keys(), ...profits.keys()]);
+	const rows: DayScore[] = [];
+	for (const day of keys) {
+		const at = parseStamp(day);
+		if (since != null && at && at.getTime() < since) continue;
+		const s = byDay.get(day);
+		const p = profits.get(day);
+		rows.push({
+			day,
+			weekday: WEEKDAYS[((at?.getDay() ?? 1) + 6) % 7],
+			discipline: avg(s?.discipline ?? []),
+			calm: avg(s?.calm ?? []),
+			profit: Number((p?.profit ?? 0).toFixed(2)),
+			count: p?.count ?? 0
+		});
+	}
+	return rows.sort((a, b) => (a.day < b.day ? 1 : -1));
+}
+
+export interface MistakeStat {
+	/** Тип записи: «Разбор ошибки», «Разбор дня» (главная ошибка) или тег. */
+	source: 'mistake' | 'day' | 'tag';
+	label: string;
+	count: number;
+	/** P/L дней, в которые это встречалось. */
+	profit: number;
+}
+
+/**
+ * Топ ошибок за период: записи «Разбор ошибки», главные ошибки «Разбора дня»
+ * и теги, которыми помечены ошибки. Порядок — по частоте, затем по алфавиту.
+ */
+export function topMistakes(entries: DiaryEntry[], trades: Trade[], since?: number, limit = 8): MistakeStat[] {
+	const acc = new Map<string, MistakeStat>();
+	const bump = (source: MistakeStat['source'], label: string, day: string) => {
+		const key = `${source}:${label.toLowerCase()}`;
+		const stat = acc.get(key) ?? { source, label, count: 0, profit: 0 };
+		stat.count++;
+		stat.profit += dayTotals(trades, day).profit;
+		acc.set(key, stat);
+	};
+	for (const e of entries) {
+		if (since != null) {
+			const t = parseStamp(e.at)?.getTime();
+			if (t == null || t < since) continue;
+		}
+		const day = dayKey(e.at) ?? '';
+		if (e.kind === 'mistake') {
+			bump('mistake', e.mistakeWhat.trim().split('\n')[0].slice(0, 80) || 'ошибка без описания', day);
+			for (const tag of e.tags) bump('tag', tag, day);
+		}
+		if (e.kind === 'day' && e.mainMistake.trim()) bump('day', e.mainMistake.trim().slice(0, 80), day);
+	}
+	return [...acc.values()]
+		.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'ru'))
+		.slice(0, limit);
+}
+
+export interface WeekdayScore {
+	weekday: string;
+	discipline: number | null;
+	calm: number | null;
+	days: number;
+}
+
+/** Средние шкалы по дням недели (Пн..Вс) за период. */
+export function weekdayScores(entries: DiaryEntry[], since?: number): WeekdayScore[] {
+	const buckets = new Map<string, { discipline: number[]; calm: number[]; days: Set<string> }>();
+	for (const e of entries) {
+		const at = parseStamp(e.at);
+		if (!at) continue;
+		if (since != null && at.getTime() < since) continue;
+		if (e.discipline == null && e.calm == null) continue;
+		const weekday = WEEKDAYS[(at.getDay() + 6) % 7];
+		const bucket = buckets.get(weekday) ?? { discipline: [], calm: [], days: new Set<string>() };
+		if (e.discipline != null) bucket.discipline.push(e.discipline);
+		if (e.calm != null) bucket.calm.push(e.calm);
+		bucket.days.add(dayKey(e.at) ?? '');
+		buckets.set(weekday, bucket);
+	}
+	return WEEKDAYS.map((weekday) => {
+		const b = buckets.get(weekday);
+		return {
+			weekday,
+			discipline: avg(b?.discipline ?? []),
+			calm: avg(b?.calm ?? []),
+			days: b?.days.size ?? 0
+		};
+	});
 }

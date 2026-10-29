@@ -22,7 +22,14 @@ import {
   syncTagVocabulary,
   emptyDiaryFilters,
   entryDays,
-  tagsInUse
+  tagsInUse,
+  dayEntry,
+  upsertDayEntry,
+  dayTotals,
+  killzoneOf,
+  dayScores,
+  topMistakes,
+  weekdayScores
 } from './diary.ts';
 
 let pass = 0, fail = 0;
@@ -194,6 +201,63 @@ eq('diary groups', dg.map(g=>g.key), ['2026-01-06','2026-01-05']);
 eq('diary fresh first', dg[0].entries.map(e=>e.id), ['d3','d2']);
 eq('diary tags in use', tagsInUse(diary), ['лондон','психология','риск']);
 eq('diary vocab sync', syncTagVocabulary(diary, ['старый','риск']), ['лондон','психология','риск']);
+
+// «Разбор дня»: поля, одна запись на день, авто-итоги из сделок
+const day1 = normalizeEntry({id:'day1',kind:'day',at:'2026-01-05 00:00:00',dayPlan:'только Лондон',dayResult:'два входа по чек-листу',mainMistake:'вход без ретеста',checklist:'partial'});
+eq('day plan', day1.dayPlan, 'только Лондон');
+eq('day checklist', day1.checklist, 'partial');
+eq('day bad checklist', normalizeEntry({checklist:'maybe'}).checklist, null);
+eq('day entry find', dayEntry([day1, d2], '2026-01-05')?.id, 'day1');
+eq('day entry none', dayEntry([d2], '2026-01-05'), null);
+eq('day search plan', filterEntries([day1,d2], {...emptyDiaryFilters(), search:'лондон'}).map(e=>e.id), ['day1','d2']);
+
+// Одна запись на день: повторное сохранение возвращает id существующей
+const up1 = upsertDayEntry([day1], {at:'2026-01-05 00:00:00', dayResult:'итог'});
+eq('day upsert keeps id', up1.id, 'day1');
+eq('day upsert stamps day', up1.at, '2026-01-05 00:00:00');
+const up2 = upsertDayEntry([day1], {at:'2026-01-07 21:30:00'});
+eq('day upsert new', up2.id, undefined);
+eq('day upsert new stamps', up2.at, '2026-01-07 00:00:00');
+
+const tA = normalizeTrade({id:'t1',pair:'EURUSD',direction:'long',volume:1,priceOpen:1.1,priceClose:1.105,status:'closed',dateOpen:'2026-01-05 09:00:00',dateClose:'2026-01-05 11:00:00'});
+const tB = normalizeTrade({id:'t2',pair:'EURUSD',direction:'short',volume:1,priceOpen:1.1,priceClose:1.103,status:'closed',dateOpen:'2026-01-05 14:00:00',dateClose:'2026-01-05 15:00:00'});
+const tC = normalizeTrade({id:'t3',pair:'XAUUSD',direction:'long',volume:0.1,priceOpen:2000,status:'open',dateOpen:'2026-01-07 02:00:00'});
+eq('killzone london', killzoneOf('2026-01-05T09:00:00Z'), 'Лондон');
+eq('killzone ny', killzoneOf('2026-01-05T14:00:00Z'), 'Нью-Йорк');
+eq('killzone asia', killzoneOf('2026-01-07T02:00:00Z'), 'Азия');
+
+const dayTot = dayTotals([tA,tB,tC], '2026-01-05', ['t1']);
+eq('day totals profit', dayTot.profit, 200);
+eq('day totals count', dayTot.count, 2);
+eq('day totals closed', dayTot.closed, 2);
+eq('day totals wins', dayTot.wins, 1);
+eq('day totals losses', dayTot.losses, 1);
+eq('day totals linked', dayTot.linkedCount, 1);
+eq('day totals killzones', dayTot.killzones, ['Азия','Лондон']);
+eq('day totals empty day', dayTotals([tA], '2026-02-01'), {profit:0,count:0,closed:0,wins:0,losses:0,killzones:[],linkedCount:0});
+
+// Шкалы по дням рядом с P/L
+const scores = dayScores([d1,d2,d3,day1], [tA,tB,tC]);
+eq('scores days desc', scores.map(s=>s.day), ['2026-01-07','2026-01-06','2026-01-05']);
+eq('scores profit', scores[2].profit, 200);
+eq('scores avg discipline', scores[2].discipline, 5);
+eq('scores no scores', scores[0].discipline, null);
+eq('scores weekday', scores[2].weekday, 'Пн');
+eq('scores since', dayScores([d1,d2], [tA], new Date('2026-01-06T00:00:00').getTime()).map(s=>s.day), ['2026-01-06']);
+
+// Топ ошибок по типам/тегам
+const tops = topMistakes([d1,d3,day1], [tA,tB]);
+eq('top mistakes labels', tops.map(m=>m.label), ['вход без ретеста','открыл до закрытия свечи','риск']);
+eq('top mistakes order', tops.map(m=>m.count), [1,1,1]);
+eq('top mistakes profit', tops[0].profit, 200);
+eq('top mistakes limit', topMistakes([d1,d3,day1], [tA,tB], undefined, 1).length, 1);
+
+// Средние шкалы по дням недели
+const wd = weekdayScores([d1,d2,d3,day1]);
+eq('weekday len', wd.length, 7);
+eq('weekday monday', [wd[0].weekday, wd[0].discipline, wd[0].calm, wd[0].days], ['Пн', 5, 1, 1]);
+eq('weekday tuesday', [wd[1].discipline, wd[1].calm, wd[1].days], [4, 3, 1]);
+eq('weekday empty', [wd[6].weekday, wd[6].discipline], ['Вс', null]);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

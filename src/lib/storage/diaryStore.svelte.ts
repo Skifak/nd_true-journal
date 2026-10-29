@@ -7,6 +7,7 @@ import {
 	createEntry,
 	normalizeEntry,
 	syncTagVocabulary,
+	upsertDayEntry,
 	type DiaryEntry
 } from '../domain/diary.ts';
 
@@ -87,6 +88,19 @@ export function addEntry(patch: Partial<DiaryEntry> = {}): DiaryEntry {
 	tags = syncTagVocabulary(entries, $state.snapshot(tags) as string[]);
 	scheduleSave();
 	return entry;
+}
+
+/**
+ * Сохранить «Разбор дня». Одна запись на день: если запись дня уже есть —
+ * обновляем её, иначе создаём новую.
+ */
+export function saveDayEntry(patch: Partial<DiaryEntry>): DiaryEntry {
+	const merged = upsertDayEntry($state.snapshot(entries) as DiaryEntry[], patch);
+	if (merged.id) {
+		updateEntry(merged.id, merged);
+		return entries.find((e) => e.id === merged.id)!;
+	}
+	return addEntry(merged);
 }
 
 /** Обновить запись по id. */

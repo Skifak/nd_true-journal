@@ -5,8 +5,10 @@
 	import { getTrades, initJournal, journalState } from '#lib/storage/journalStore.svelte.ts';
 	import { equityCurve } from '#lib/domain/journal.ts';
 	import { formatMoney, parseStamp, tradeProfit } from '#lib/domain/trades.ts';
+	import DiaryStats from '#lib/components/DiaryStats.svelte';
 	import EquityChart from '#lib/components/EquityChart.svelte';
 	import PanelToggle from '#lib/components/PanelToggle.svelte';
+	import { getEntries, initDiary } from '#lib/storage/diaryStore.svelte.ts';
 
 	const app = namespaced('ndtj:app:');
 
@@ -50,6 +52,10 @@
 	const rangeEmpty = $derived(curve.values.length < 2);
 
 	initJournal();
+	initDiary();
+
+	// Блоки дневника в сводке: записи и те же сделки/период, что у KPI и графика
+	let diaryEntries = $derived(getEntries());
 
 	let platform = $state(detectPlatform());
 	let note = $state(app.get('note') ?? '');
@@ -166,6 +172,9 @@
 		</div>
 	</div>
 </section>
+
+<!-- Три блока дневника: шкалы по дням, топ ошибок, средние по дням недели -->
+<DiaryStats entries={diaryEntries} trades={periodTrades} {since} loading={journalState.loading} />
 
 <section class="grid-2">
 	<!-- Активность -->

@@ -3,10 +3,14 @@
 	 * Страница «Дневник»: лента записей по дням, поиск, фильтры по типу и тегу.
 	 * Данные — из diaryStore, связанные сделки — из journalStore (только для подписей).
 	 */
+	import DayReviewDialog from '#lib/components/DayReviewDialog.svelte';
 	import DiaryDialog from '#lib/components/DiaryDialog.svelte';
 	import Modal from '#lib/components/Modal.svelte';
 	import {
+		CHECKLIST_OPTIONS,
 		DIARY_KINDS,
+		dayEntry,
+		dayTotals,
 		emptyDiaryFilters,
 		entryDays,
 		filterEntries,
@@ -25,6 +29,7 @@
 		getEntries,
 		getTagVocabulary,
 		initDiary,
+		saveDayEntry,
 		updateEntry
 	} from '#lib/storage/diaryStore.svelte.ts';
 	import { loadUiSetting, saveUiSetting } from '#lib/storage/journal.ts';
@@ -49,6 +54,10 @@
 	let createDay = $state<string | null>(null);
 	let confirmId = $state<string | null>(null);
 	let toast = $state('');
+
+	// «Разбор дня» — отдельная форма: одна запись на день, итоги из сделок
+	let dayOpen = $state(false);
+	let dayKeySel = $state('');
 
 	$effect(() => {
 		initDiary();
@@ -132,6 +141,23 @@
 	}
 
 	const planLabel = (v: boolean | null) => (v === true ? 'по плану' : v === false ? 'вне плана' : '—');
+
+	const checklistLabel = (v: DiaryEntry['checklist']) =>
+		CHECKLIST_OPTIONS.find((o) => o.id === v)?.label ?? '—';
+
+	// Разбор дня текущего дня в ленте — для авто-итогов в форме
+	const dayEntryShown = $derived(dayKeySel ? dayEntry(all, dayKeySel) : null);
+	const dayTotalsShown = $derived(dayTotals(getTrades(), dayKeySel, dayEntryShown?.tradeIds ?? []));
+
+	function openDay(day: string) {
+		dayKeySel = day;
+		dayOpen = true;
+	}
+
+	function handleDaySave(patch: Partial<DiaryEntry>) {
+		saveDayEntry(patch);
+		showToast('Разбор дня сохранён');
+	}
 </script>
 
 <section class="page">
@@ -142,7 +168,12 @@
 				{all.length} записей · {days.length} дней · фильтр {matched.length}
 			</p>
 		</div>
-		<button class="btn primary" onclick={() => openNew()}>Создать запись</button>
+		<div class="head-actions">
+			<button class="btn" onclick={() => openDay(filters.day ?? new Date().toISOString().slice(0, 10))}>
+				Разбор дня
+			</button>
+			<button class="btn primary" onclick={() => openNew()}>Создать запись</button>
+		</div>
 	</header>
 
 	{#if diaryState.error}
@@ -240,6 +271,7 @@
 				<div class="day-head">
 					<h2 class="day-title">{dayLabel(group.key)}</h2>
 					<span class="eyebrow">{group.entries.length} записей</span>
+					<button class="text-link" onclick={() => openDay(group.key)}>разбор дня</button>
 					<button class="text-link add" onclick={() => openNew(group.key)}>+ запись</button>
 				</div>
 				<ul class="feed">
@@ -260,6 +292,18 @@
 									}}>Удалить</button>
 								</div>
 							</div>
+
+							{#if e.kind === 'day'}
+								<dl class="mistake">
+									{#if e.dayPlan}<dt>План</dt><dd>{e.dayPlan}</dd>{/if}
+									{#if e.dayResult}<dt>Итог</dt><dd>{e.dayResult}</dd>{/if}
+									{#if e.mainMistake}<dt>Главная ошибка</dt><dd>{e.mainMistake}</dd>{/if}
+									<dt>Чек-лист входа</dt>
+									<dd class:warn={e.checklist === 'no'} class:soft={e.checklist === 'partial'}>
+										{checklistLabel(e.checklist)}
+									</dd>
+								</dl>
+							{/if}
 
 							{#if e.kind === 'mistake'}
 								<dl class="mistake">
@@ -308,6 +352,15 @@
 	}}
 />
 
+<DayReviewDialog
+	bind:open={dayOpen}
+	day={dayKeySel}
+	entry={dayEntryShown}
+	totals={dayTotalsShown}
+	tags={vocabulary}
+	onSave={handleDaySave}
+/>
+
 <Modal bind:open={confirmOpen} title="Удалить запись?" size="sm" onClose={() => (confirmId = null)}>
 	<p class="confirm-text">
 		{confirmEntry ? formatDate(confirmEntry.at) + ' · ' + kindInfo(confirmEntry.kind).label : ''}
@@ -331,6 +384,10 @@
 		justify-content: space-between;
 		gap: var(--sp-md);
 		margin-bottom: 1.2rem;
+	}
+	.head-actions {
+		display: flex;
+		gap: 0.5rem;
 	}
 	h1 {
 		font-family: var(--font-display);
@@ -498,6 +555,12 @@
 	}
 	.plan.warn {
 		color: var(--status-orange);
+	}
+	.mistake dd.warn {
+		color: var(--status-orange);
+	}
+	.mistake dd.soft {
+		color: var(--status-amber);
 	}
 	.entry-actions {
 		margin-left: auto;
