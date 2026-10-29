@@ -31,6 +31,7 @@ import { clearSessions, loadSessions, saveSessions } from './sessions.ts';
 import { isCacheUsable, loadModelsCache, saveModelsCache } from './modelsCache.ts';
 import { attachmentsToDataUrls, buildJournalContext, collectAttachmentIds } from './context.ts';
 import { parseStamp, uuid, type Trade } from '../domain/trades.ts';
+import type { DiaryEntry } from '../domain/diary.ts';
 import { namespaced } from '../storage/local.ts';
 
 const ns = namespaced('ndtj:ai:');
@@ -398,7 +399,9 @@ export async function send(
 	allTrades: Trade[],
 	dayNote: string,
 	payload: SendPayload,
-	freeText: string
+	freeText: string,
+	/** Записи дневника; читаются вызывающим только при включённой галочке. */
+	diaryEntries: DiaryEntry[] = []
 ): Promise<void> {
 	if (generating) throw new Error('Уже идёт генерация');
 	if (!keyReady || !memoryHasKey()) throw new Error('Нет подключённого ключа');
@@ -414,7 +417,12 @@ export async function send(
 
 	const reqTrades = tradesForRequest(payload, allTrades);
 	const sections = new Set<SectionKey>(settings.sections);
-	const contextText = buildJournalContext({ sections, trades: reqTrades, note: dayNote });
+	const contextText = buildJournalContext({
+		sections,
+		trades: reqTrades,
+		note: dayNote,
+		diary: sections.has('diary') ? diaryEntries : []
+	});
 
 	// Вложения — только vision-моделям (выбор «убрать/сменить модель» делает UI до вызова).
 	let images: string[] = [];

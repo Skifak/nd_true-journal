@@ -7,6 +7,7 @@
 	import { onMount } from 'svelte';
 	import { namespaced } from '#lib/storage/local.ts';
 	import { getTrades, initJournal, journalState } from '#lib/storage/journalStore.svelte.ts';
+	import { getEntries, initDiary } from '#lib/storage/diaryStore.svelte.ts';
 	import { formatMoney, tradeProfit } from '#lib/domain/trades.ts';
 	import { supportsVision } from '#lib/ai/api.ts';
 	import {
@@ -28,6 +29,8 @@
 	const app = namespaced('ndtj:app:');
 
 	initJournal();
+	// Дневник грузится всегда (он локальный), но в контекст попадает только при галочке.
+	void initDiary();
 	onMount(() => void initAi());
 
 	let input = $state('');
@@ -82,7 +85,7 @@
 		const prev = input;
 		if (payload.kind === 'free') input = ''; // поле чистим сразу — не ждём конца генерации
 		try {
-			await send(getTrades(), dayNote(), payload, text);
+			await send(getTrades(), dayNote(), payload, text, getEntries());
 		} catch (e) {
 			if (payload.kind === 'free') input = prev; // предусловия не прошли — возвращаем текст
 			notice = e instanceof Error ? e.message : String(e);

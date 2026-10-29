@@ -6,12 +6,13 @@
 export type ThinkingLevel = 'low' | 'medium' | 'high' | 'max';
 
 /** Разделы журнала, разрешённые к отправке поставщику AI. */
-export type SectionKey = 'trades' | 'comments' | 'notes' | 'attachments';
+export type SectionKey = 'trades' | 'comments' | 'notes' | 'diary' | 'attachments';
 
 export const SECTION_LABELS: Record<SectionKey, string> = {
 	trades: 'Сделки',
 	comments: 'Комментарии',
 	notes: 'Заметки',
+	diary: 'Дневник',
 	attachments: 'Вложения (изображения)'
 };
 
@@ -21,7 +22,7 @@ export type DataPreset = 'min' | 'work' | 'all' | 'custom';
 export const PRESETS: { id: DataPreset; label: string; sections: SectionKey[] }[] = [
 	{ id: 'min', label: 'Минимум', sections: ['trades'] },
 	{ id: 'work', label: 'Рабочий контекст', sections: ['trades', 'comments', 'notes'] },
-	{ id: 'all', label: 'Разрешить всё', sections: ['trades', 'comments', 'notes', 'attachments'] }
+	{ id: 'all', label: 'Разрешить всё', sections: ['trades', 'comments', 'notes', 'diary', 'attachments'] }
 ];
 
 /** Системный файл контекста: текст + флаг включения в запросы. */
@@ -42,6 +43,7 @@ export interface AiSettings {
 	files: { agent: ContextFile; claude: ContextFile };
 }
 
+/** Дневник в умолчаниях отсутствует: личные записи уходят только по явной галочке. */
 export function defaultSettings(): AiSettings {
 	return {
 		baseUrl: '',

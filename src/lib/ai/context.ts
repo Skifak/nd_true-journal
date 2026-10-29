@@ -1,10 +1,11 @@
 /**
- * Сборка контекста журнала для запроса: разделы (сделки, комментарии, заметки)
- * одним компактным текстом; вложения — отдельно, списком id (отправляются
+ * Сборка контекста журнала для запроса: разделы (сделки, комментарии, заметки,
+ * дневник) одним компактным текстом; вложения — отдельно, списком id (отправляются
  * картинками только vision-моделям).
  */
 import type { SectionKey } from './types.ts';
 import { tradeProfit, tradeSource, parseStamp, type Trade } from '../domain/trades.ts';
+import { kindInfo, type DiaryEntry } from '../domain/diary.ts';
 import { getBlob } from '../storage/idb.ts';
 
 export interface ContextInput {
@@ -12,6 +13,8 @@ export interface ContextInput {
 	trades: Trade[];
 	/** Заметка дня (в приложении она одна). */
 	note: string;
+	/** Записи дневника — читаются только при включённой галочке. */
+	diary?: DiaryEntry[];
 }
 
 /** Собрать текстовый контекст журнала по разрешённым разделам. */
@@ -61,10 +64,54 @@ export function buildJournalContext(input: ContextInput): string {
 		parts.push(`# Заметки\n${note.trim()}`);
 	}
 
+	if (sections.has('diary')) {
+		const diary = diaryLines(input.diary ?? []);
+		if (diary) parts.push(`# Дневник\n${diary}`);
+	}
+
 	if (!parts.length) {
 		return 'Журнал пуст или ни один раздел данных не разрешён к отправке.';
 	}
 	return parts.join('\n\n');
+}
+
+/**
+ * Записи дневника одной строкой каждая: тип, время, текст, поля разборов,
+ * шкалы, теги, связи со сделками. Пустой дневник → пустая строка.
+ */
+function diaryLines(entries: DiaryEntry[]): string {
+	const sorted = [...entries].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+	const lines = sorted.map((e) => {
+		const fields = [
+			`[${kindInfo(e.kind).label}] ${e.at}`,
+			flat(e.text),
+			e.kind === 'mistake' ? labeled('что', e.mistakeWhat) : '',
+			e.kind === 'mistake' ? labeled('почему', e.mistakeWhy) : '',
+			e.kind === 'mistake' ? labeled('что изменю', e.mistakeFix) : '',
+			e.kind === 'day' ? labeled('план', e.dayPlan) : '',
+			e.kind === 'day' ? labeled('итог', e.dayResult) : '',
+			e.kind === 'day' ? labeled('главная ошибка', e.mainMistake) : '',
+			e.kind === 'day' && e.checklist ? `чек-лист: ${CHECKLIST_SHORT[e.checklist]}` : '',
+			e.discipline != null ? `дисциплина ${e.discipline}/5` : '',
+			e.calm != null ? `спокойствие ${e.calm}/5` : '',
+			e.followedPlan == null ? '' : `план: ${e.followedPlan ? 'да' : 'нет'}`,
+			e.tags.length ? `теги: ${e.tags.join(', ')}` : '',
+			e.tradeIds.length ? `сделки: ${e.tradeIds.join(', ')}` : ''
+		];
+		return fields.filter(Boolean).join(' | ');
+	});
+	return lines.join('\n');
+}
+
+const CHECKLIST_SHORT = { yes: 'да', partial: 'частично', no: 'нет' } as const;
+
+function flat(text: string): string {
+	return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
+function labeled(name: string, value: string): string {
+	const text = flat(value);
+	return text ? `${name}: ${text}` : '';
 }
 
 /** Уникальные id вложений по сделкам (для отправки картинками). */

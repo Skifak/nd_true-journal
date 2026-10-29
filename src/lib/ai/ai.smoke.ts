@@ -16,6 +16,8 @@ import {
 	DEFAULT_BASE_URL
 } from './api.ts';
 import { buildJournalContext, collectAttachmentIds } from './context.ts';
+import { defaultSettings, PRESETS } from './types.ts';
+import { normalizeEntry } from '../domain/diary.ts';
 import { formatBytes, historyStats } from './sessions.ts';
 import { isCacheUsable, MODELS_TTL_MS, type ModelsCache } from './modelsCache.ts';
 import { normalizeTrade, type Trade } from '../domain/trades.ts';
@@ -95,7 +97,7 @@ const trades: Trade[] = [
 		attachments: ['a1', 'a2']
 	})
 ];
-const all = new Set(['trades', 'comments', 'notes', 'attachments'] as const);
+const all = new Set(['trades', 'comments', 'notes', 'diary', 'attachments'] as const);
 
 const withAll = buildJournalContext({ sections: all, trades, note: 'день хороший' });
 eq('ctx has trades header', withAll.includes('# Сделки (2)'), true);
@@ -109,6 +111,53 @@ eq('ctx min hides comments', tradesOnly.includes('по тренду'), false);
 
 const empty = buildJournalContext({ sections: new Set(), trades, note: '' });
 eq('ctx empty', empty.includes('ни один раздел'), true);
+
+// Дневник: уходит только по явной галочке
+const diary = [
+	normalizeEntry({
+		id: 'd1',
+		kind: 'mistake',
+		at: '2026-01-05 10:30:00',
+		text: 'вошёл против тренда',
+		mistakeWhat: 'вход до ретеста',
+		mistakeWhy: 'поспешил',
+		mistakeFix: 'ждать закрытия свечи',
+		discipline: 2,
+		calm: 3,
+		followedPlan: false,
+		tags: ['fomo'],
+		tradeIds: ['t1']
+	}),
+	normalizeEntry({
+		id: 'd2',
+		kind: 'day',
+		at: '2026-01-06 00:00:00',
+		dayPlan: 'две сделки максимум',
+		dayResult: 'одна',
+		mainMistake: 'ранний вход',
+		checklist: 'partial'
+	})
+];
+eq('preset all has diary', PRESETS.find((p) => p.id === 'all')!.sections.includes('diary'), true);
+eq('preset work no diary', PRESETS.find((p) => p.id === 'work')!.sections.includes('diary'), false);
+eq('preset min no diary', PRESETS.find((p) => p.id === 'min')!.sections.includes('diary'), false);
+eq('default no diary', defaultSettings().sections.includes('diary'), false);
+
+const withDiary = buildJournalContext({ sections: all, trades, note: '', diary });
+eq('ctx diary header', withDiary.includes('# Дневник'), true);
+eq('ctx diary kind', withDiary.includes('[Разбор ошибки]'), true);
+eq('ctx diary mistake fields', withDiary.includes('почему: поспешил') && withDiary.includes('что изменю: ждать закрытия свечи'), true);
+eq('ctx diary scales', withDiary.includes('дисциплина 2/5') && withDiary.includes('план: нет'), true);
+eq('ctx diary tags', withDiary.includes('теги: fomo'), true);
+eq('ctx diary trade link', withDiary.includes('сделки: t1'), true);
+eq(
+	'ctx diary day fields', withDiary.includes('план: две сделки максимум') && withDiary.includes('чек-лист: частично'), true);
+
+const noDiarySection = buildJournalContext({ sections: new Set(['trades', 'notes']), trades, note: '', diary });
+eq('ctx diary off hidden', noDiarySection.includes('# Дневник'), false);
+eq('ctx diary off no text', noDiarySection.includes('поспешил'), false);
+
+eq('ctx diary empty section', buildJournalContext({ sections: all, trades, note: '', diary: [] }).includes('# Дневник'), false);
 
 // Вложения
 eq('attachments ids', collectAttachmentIds(trades), ['a1', 'a2']);
