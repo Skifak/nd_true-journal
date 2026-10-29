@@ -9,8 +9,9 @@
 		{ idx: '01', label: 'Дашборд', path: '/' },
 		{ idx: '02', label: 'Все сделки', path: '/trades' },
 		{ idx: '03', label: 'Статистика', path: '/statistics' },
-		{ idx: '04', label: 'AI', path: '/ai' },
-		{ idx: '05', label: 'Настройки', path: '/settings' }
+		{ idx: '04', label: 'Дневник', path: '/diary' },
+		{ idx: '05', label: 'AI', path: '/ai' },
+		{ idx: '06', label: 'Настройки', path: '/settings' }
 	];
 
 	const current = $derived(nav.find((n) => n.path === page.url.pathname) ?? nav[0]);
@@ -94,6 +95,10 @@
 			<path d="M2.5 7.5h15M7.5 7.5v9" />
 		{:else if path === '/statistics'}
 			<path d="M2.5 17.5v-6M8.5 17.5v-9M14.5 17.5v-12" />
+		{:else if path === '/diary'}
+			<path d="M4.5 2.5h11v15h-11z" />
+			<path d="M7.5 2.5v15" />
+			<path d="M10 6.5h3M10 10h3M10 13.5h2" />
 		{:else if path === '/ai'}
 			<path d="M10 2.5v3M10 14.5v3M2.5 10h3M14.5 10h3M4.7 4.7l2.1 2.1M13.2 13.2l2.1 2.1M15.3 4.7l-2.1 2.1M6.8 13.2l-2.1 2.1" />
 			<circle cx="10" cy="10" r="2.6" />

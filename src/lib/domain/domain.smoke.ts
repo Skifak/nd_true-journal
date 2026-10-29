@@ -15,6 +15,15 @@ import { calculateProfit, tradeProfit, calculatePips, normalizeTrade, formatMone
 import { filterTrades, sortTrades, computeTotals, groupByDay, equityCurve, emptyFilters } from './journal.ts';
 import { primaryKillzone, byKillzone } from './killzones.ts';
 import { parseMt5Report, parseNumber, parseMt5Date, decodeMt5Html } from './mt5.ts';
+import {
+  filterEntries,
+  groupByDiaryDay,
+  normalizeEntry,
+  syncTagVocabulary,
+  emptyDiaryFilters,
+  entryDays,
+  tagsInUse
+} from './diary.ts';
 
 let pass = 0, fail = 0;
 const eq = (name: string, a: unknown, b: unknown) => {
@@ -158,6 +167,33 @@ eq('kz rows', byKillzone(kzTrades), [
 	{ id: 'london', label: 'Лондонская KZ', pnl: 100, count: 1, wins: 1 },
 	{ id: 'out', label: 'Вне KZ', pnl: -30, count: 1, wins: 0 }
 ]);
+// Дневник: нормализация, фильтры, группировка, словарь тегов
+const d1 = normalizeEntry({id:'d1',kind:'mistake',at:'2026-01-05 10:00:00',text:'вход раньше сигнала',mistakeWhat:'открыл до закрытия свечи',mistakeWhy:'страх упустить',mistakeFix:'ждать закрытия',tags:['риск','риск'],discipline:9,calm:0,followedPlan:false,tradeIds:['a','a']});
+eq('diary kind', d1.kind, 'mistake');
+eq('diary tags dedup', d1.tags, ['риск']);
+eq('diary discipline clamp', d1.discipline, 5);
+eq('diary calm clamp', d1.calm, 1);
+eq('diary plan', d1.followedPlan, false);
+eq('diary tradeIds dedup', d1.tradeIds, ['a']);
+eq('diary bad kind', normalizeEntry({kind:'xxx'}).kind, 'note');
+eq('diary bad score', normalizeEntry({discipline:'abc'}).discipline, null);
+eq('diary plan unset', normalizeEntry({}).followedPlan, null);
+
+const d2 = normalizeEntry({id:'d2',kind:'note',at:'2026-01-06 09:00:00',text:'лондон дал продолжение',tags:['лондон'],discipline:4,calm:3,followedPlan:true});
+const d3 = normalizeEntry({id:'d3',kind:'emotion',at:'2026-01-06 18:00:00',text:'после двух минусов хочется отыграться',tags:['психология']});
+const diary = [d1, d2, d3];
+
+eq('diary search text', filterEntries(diary, {...emptyDiaryFilters(), search:'отыграться'}).map(e=>e.id), ['d3']);
+eq('diary search mistake field', filterEntries(diary, {...emptyDiaryFilters(), search:'упустить'}).map(e=>e.id), ['d1']);
+eq('diary filter kind', filterEntries(diary, {...emptyDiaryFilters(), kind:'note'}).map(e=>e.id), ['d2']);
+eq('diary filter tag', filterEntries(diary, {...emptyDiaryFilters(), tag:'риск'}).map(e=>e.id), ['d1']);
+eq('diary filter day', filterEntries(diary, {...emptyDiaryFilters(), day:'2026-01-06'}).map(e=>e.id), ['d2','d3']);
+eq('diary days desc', entryDays(diary), ['2026-01-06','2026-01-05']);
+const dg = groupByDiaryDay(diary);
+eq('diary groups', dg.map(g=>g.key), ['2026-01-06','2026-01-05']);
+eq('diary fresh first', dg[0].entries.map(e=>e.id), ['d3','d2']);
+eq('diary tags in use', tagsInUse(diary), ['лондон','психология','риск']);
+eq('diary vocab sync', syncTagVocabulary(diary, ['старый','риск']), ['лондон','психология','риск']);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
